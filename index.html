@@ -45,6 +45,15 @@
   #setPanel input[type=range] { width:100%; height:20px; accent-color:#5B8C3E; }
   #setPanel button { width:100%; margin-top:10px; padding:8px 0; font-size:13px; }
   #pwMsg { font-size:11px; color:#E5B356; min-height:14px; margin-top:6px; }
+  #keyPanel { display:none; position:absolute; top:44px; right:0; z-index:11; width:250px;
+              background:#252E33; border:1px solid #3C4A52; border-radius:8px; padding:14px 16px;
+              box-shadow:0 6px 18px rgba(0,0,0,0.45); }
+  .keyRow { display:flex; align-items:center; justify-content:space-between; margin:6px 0; }
+  .keyRow span { font-size:13px; color:#9FB3BB; }
+  .keyRow button { flex:0 0 auto; width:110px; padding:6px 0; font-size:12px; font-family:monospace; }
+  .keyRow button.listen { background:#5B8C3E; }
+  #keyReset { width:100%; margin-top:10px; padding:7px 0; font-size:12px; }
+  #keyNote { font-size:10px; color:#6E8089; margin-top:8px; }
   #pauseBtn2 { background:#7A5C2E; }
   #pauseBtn2:hover { background:#8F6C36; }
   #topBar { width:1000px; display:flex; align-items:center; justify-content:space-between;
@@ -120,8 +129,15 @@
     <div id="topRight">
       <div id="roomInfo"></div>
       <button class="miniBtn" id="copyBtn" style="display:none">Kopyala</button>
+      <button class="miniBtn" id="keysBtn">Tuşlar</button>
       <button class="miniBtn" id="gearBtn">Ayarlar</button>
     </div>
+  </div>
+  <div id="keyPanel">
+    <div class="settitle" style="font-size:11px;letter-spacing:2px;color:#CDE6B4;margin-bottom:4px">TUŞ ATAMALARI</div>
+    <div id="keyRows"></div>
+    <button id="keyReset">Varsayılana Dön</button>
+    <div id="keyNote">Değiştirmek için tuşa tıkla, sonra yeni tuşa bas. Yön okları her zaman hareket için de çalışır.</div>
   </div>
   <div id="setPanel">
     <div id="setLock">
@@ -348,40 +364,46 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     }
     if(ball.ct<=0){ ball.cw=null; ball.ct=0; }
   }
-  ball.x += ball.vx*dt; ball.y += ball.vy*dt;
+  // alt adimlarla hareket: hizli topun oyuncu/duvar icinden gecmesini engeller
+  var bsp = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+  var nSub = Math.max(1, Math.ceil(bsp*dt/5));
+  for(var sub=0; sub<nSub; sub++){
+    ball.x += ball.vx*dt/nSub; ball.y += ball.vy*dt/nSub;
+
+    // top - oyuncu çarpışması
+    for(var i2=0;i2<G.players.length;i2++){
+      var q = G.players[i2];
+      var dx2=ball.x-q.x, dy2=ball.y-q.y, d2=Math.sqrt(dx2*dx2+dy2*dy2);
+      if(d2>0 && d2 < PR+BR){
+        var nx2=dx2/d2, ny2=dy2/d2;
+        ball.x = q.x + nx2*(PR+BR);
+        ball.y = q.y + ny2*(PR+BR);
+        var rel = (ball.vx-q.vx)*nx2 + (ball.vy-q.vy)*ny2;
+        if(rel<0){ ball.vx -= 1.3*rel*nx2; ball.vy -= 1.3*rel*ny2; }
+        ball.vx += q.vx*0.18; ball.vy += q.vy*0.18;
+        ball.cw = null; ball.ct = 0; // dokunus falsoyu bitirir
+      }
+    }
+
+    // top duvarları: üst/alt saha çizgisi, sol/sağ kale ağzı hariç
+    if(ball.y < PY0+BR){ ball.y = PY0+BR; ball.vy = -ball.vy*BOUNCE; }
+    if(ball.y > PY1-BR){ ball.y = PY1-BR; ball.vy = -ball.vy*BOUNCE; }
+    var mouth = ball.y > GY0 && ball.y < GY1;
+    if(!mouth){
+      if(ball.x < PX0+BR){ ball.x = PX0+BR; ball.vx = -ball.vx*BOUNCE; }
+      if(ball.x > PX1-BR){ ball.x = PX1-BR; ball.vx = -ball.vx*BOUNCE; }
+    } else {
+      // kale içi arka ve yan ağlar
+      if(ball.x < PX0-GOAL_DEPTH+BR){ ball.x = PX0-GOAL_DEPTH+BR; ball.vx = -ball.vx*0.4; }
+      if(ball.x > PX1+GOAL_DEPTH-BR){ ball.x = PX1+GOAL_DEPTH-BR; ball.vx = -ball.vx*0.4; }
+      if(ball.x < PX0 || ball.x > PX1){
+        if(ball.y < GY0+BR){ ball.y=GY0+BR; ball.vy=-ball.vy*0.4; }
+        if(ball.y > GY1-BR){ ball.y=GY1-BR; ball.vy=-ball.vy*0.4; }
+      }
+    }
+  }
   ball.vx *= Math.pow(BDAMP, dt); ball.vy *= Math.pow(BDAMP, dt);
-
-  // top - oyuncu çarpışması
-  for(var i2=0;i2<G.players.length;i2++){
-    var q = G.players[i2];
-    var dx2=ball.x-q.x, dy2=ball.y-q.y, d2=Math.sqrt(dx2*dx2+dy2*dy2);
-    if(d2>0 && d2 < PR+BR){
-      var nx2=dx2/d2, ny2=dy2/d2;
-      ball.x = q.x + nx2*(PR+BR);
-      ball.y = q.y + ny2*(PR+BR);
-      var rel = (ball.vx-q.vx)*nx2 + (ball.vy-q.vy)*ny2;
-      if(rel<0){ ball.vx -= 1.3*rel*nx2; ball.vy -= 1.3*rel*ny2; }
-      ball.vx += q.vx*0.18; ball.vy += q.vy*0.18;
-      ball.cw = null; ball.ct = 0; // dokunus falsoyu bitirir
-    }
-  }
-
-  // top duvarları: üst/alt saha çizgisi, sol/sağ kale ağzı hariç
-  if(ball.y < PY0+BR){ ball.y = PY0+BR; ball.vy = -ball.vy*BOUNCE; }
-  if(ball.y > PY1-BR){ ball.y = PY1-BR; ball.vy = -ball.vy*BOUNCE; }
   var inMouth = ball.y > GY0 && ball.y < GY1;
-  if(!inMouth){
-    if(ball.x < PX0+BR){ ball.x = PX0+BR; ball.vx = -ball.vx*BOUNCE; }
-    if(ball.x > PX1-BR){ ball.x = PX1-BR; ball.vx = -ball.vx*BOUNCE; }
-  } else {
-    // kale içi arka ve yan ağlar
-    if(ball.x < PX0-GOAL_DEPTH+BR){ ball.x = PX0-GOAL_DEPTH+BR; ball.vx = -ball.vx*0.4; }
-    if(ball.x > PX1+GOAL_DEPTH-BR){ ball.x = PX1+GOAL_DEPTH-BR; ball.vx = -ball.vx*0.4; }
-    if(ball.x < PX0 || ball.x > PX1){
-      if(ball.y < GY0+BR){ ball.y=GY0+BR; ball.vy=-ball.vy*0.4; }
-      if(ball.y > GY1-BR){ ball.y=GY1-BR; ball.vy=-ball.vy*0.4; }
-    }
-  }
 
   // gol kontrolü
   if(play){
@@ -442,9 +464,24 @@ function botThink(){
   var ball=G.ball;
   for(var t=0;t<2;t++){
     var team = G.players.filter(function(p){return p.team===t;});
-    // topa en yakın takım üyesi hücumcu
+    var ownGX = t===0 ? PX0 : PX1, ownGY = (GY0+GY1)/2;
+    // kaleci: kendi kalesine en yakin bot (takimda birden fazla bot varsa)
+    var keeper=null;
+    var botCount = team.filter(function(p){return p.bot;}).length;
+    if(botCount > 1){
+      var kd=1e9;
+      for(var ki=0;ki<team.length;ki++){
+        var kp=team[ki];
+        if(!kp.bot) continue;
+        var d0=Math.abs(kp.x-ownGX)+Math.abs(kp.y-ownGY)*0.4;
+        if(d0<kd){ kd=d0; keeper=kp; }
+      }
+    }
+    // topa en yakın takım üyesi hücumcu (kaleci haric; top kaleye yakinsa kaleci mudahale eder)
+    var ballNearGoal = Math.abs(ball.x-ownGX) < 150 && ball.y > GY0-60 && ball.y < GY1+60;
     var chaser=null, bd=1e9;
     for(var i=0;i<team.length;i++){
+      if(team[i]===keeper && !ballNearGoal) continue;
       var d=dist(team[i],ball);
       if(d<bd){ bd=d; chaser=team[i]; }
     }
@@ -455,7 +492,22 @@ function botThink(){
       p.in={u:0,d:0,l:0,r:0,s:0};
       var hasBall = dist(p,ball) < KICK_RANGE;
 
+      if(p===keeper && p!==chaser && !hasBall){
+        // kale cizgisinde topu takip et
+        var kx = t===0 ? PX0+42 : PX1-42;
+        var kyy = Math.max(GY0+14, Math.min(GY1-14, ball.y));
+        moveBot(p, kx, kyy, false);
+        slot++;
+        continue;
+      }
+
       if(hasBall){
+        if(p===keeper){
+          // kaleci topu uzaklastirir: rakip yari sahaya
+          kickToward(p, t===0 ? W*0.72 : W*0.28, PY0 + rnd(0.2,0.8)*(PY1-PY0), SHOOT_SPD);
+          slot++;
+          continue;
+        }
         // insan takım arkadaşı pas istedi mi?
         var req = null;
         for(var j=0;j<team.length;j++)
@@ -567,7 +619,8 @@ function hostDrop(pid){
 function broadcast(){
   var st = { t:'st',
     p: G.players.map(function(p){ return { i:p.id, n:p.name, t:p.team, b:p.bot?1:0,
-        x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0 }; }),
+        x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0,
+        fx:Math.round(p.fx*100)/100, fy:Math.round(p.fy*100)/100 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
     s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0 };
   for(var k in conns){ try{ conns[k].send(st); }catch(e){} }
@@ -623,7 +676,7 @@ function loop(now){
         for(var j=0;j<Gr.p.length;j++) if(Gr.p[j].i===tp.i){ rp=Gr.p[j]; break; }
         if(!rp){ Gr.p.push(JSON.parse(JSON.stringify(tp))); continue; }
         rp.x += (tp.x-rp.x)*t; rp.y += (tp.y-rp.y)*t;
-        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk;
+        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fx=tp.fx; rp.fy=tp.fy;
       }
       Gr.p = Gr.p.filter(function(rp){ return G.p.some(function(tp){return tp.i===rp.i;}); });
       Gr.b[0] += (G.b[0]-Gr.b[0])*t; Gr.b[1] += (G.b[1]-Gr.b[1])*t;
@@ -635,7 +688,7 @@ function loop(now){
 }
 
 function hostView(){
-  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0};}),
+  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fx:p.fx,fy:p.fy};}),
            b:[G.ball.x,G.ball.y], s:G.score, ph:G.phase, m:G.msg, pa:G.paused?1:0 };
 }
 
@@ -672,6 +725,15 @@ function render(v){
     ctx.strokeStyle = canKick ? '#FFFFFF' : '#1B2125';
     ctx.lineWidth = canKick ? 3 : 2;
     ctx.beginPath(); ctx.arc(p.x,p.y,PR,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    if(me){
+      // dairesel imlec + bakis yonu noktasi
+      var fl = Math.sqrt((p.fx||0)*(p.fx||0)+(p.fy||0)*(p.fy||0)) || 1;
+      var fnx=(p.fx||1)/fl, fny=(p.fy||0)/fl;
+      ctx.strokeStyle='rgba(255,255,255,0.45)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(p.x,p.y,PR+7,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle='#FFFFFF';
+      ctx.beginPath(); ctx.arc(p.x+fnx*(PR+7), p.y+fny*(PR+7), 3.2, 0, Math.PI*2); ctx.fill();
+    }
     ctx.fillStyle = me ? '#FFFFFF' : 'rgba(255,255,255,0.85)';
     ctx.font = (me?'bold ':'')+'11px Segoe UI, Arial';
     ctx.textAlign='center';
@@ -721,21 +783,77 @@ function drawGoal(x, dir){
 }
 
 /* ================= GİRİŞ ================= */
+var DEF_BINDS = { u:'KeyW', d:'KeyS', l:'KeyA', r:'KeyD', s:'ShiftLeft', pass:'KeyX', shoot:'Space' };
+var BIND_LABELS = { u:'Yukarı', d:'Aşağı', l:'Sol', r:'Sağ', s:'Sprint', pass:'Pas', shoot:'Şut' };
+var binds = loadBinds();
+var listenAction = null; // su an tus bekleyen eylem
+
+function loadBinds(){
+  try {
+    var s = localStorage.getItem('bc2d_binds');
+    if(s){ var o = JSON.parse(s); for(var k in DEF_BINDS) if(!o[k]) o[k]=DEF_BINDS[k]; return o; }
+  } catch(e){}
+  return JSON.parse(JSON.stringify(DEF_BINDS));
+}
+function saveBinds(){ try{ localStorage.setItem('bc2d_binds', JSON.stringify(binds)); }catch(e){} }
+
+function normCode(c){ return (c==='ShiftRight') ? 'ShiftLeft' : c; }
+function keyLabel(c){
+  if(c==='ShiftLeft') return 'Shift';
+  if(c==='Space') return 'Space';
+  if(c.indexOf('Key')===0) return c.slice(3);
+  if(c.indexOf('Digit')===0) return c.slice(5);
+  if(c.indexOf('Arrow')===0) return {ArrowUp:'↑ Yukarı Ok',ArrowDown:'↓ Aşağı Ok',ArrowLeft:'← Sol Ok',ArrowRight:'→ Sağ Ok'}[c] || c;
+  return c;
+}
+
 function keySet(e, down){
-  var c=e.code, hit=true;
-  if(c==='KeyW'||c==='ArrowUp') keys.u=down;
-  else if(c==='KeyS'||c==='ArrowDown') keys.d=down;
-  else if(c==='KeyA'||c==='ArrowLeft') keys.l=down;
-  else if(c==='KeyD'||c==='ArrowRight') keys.r=down;
-  else if(c==='ShiftLeft'||c==='ShiftRight') keys.s=down;
-  else if(c==='KeyX'){ if(down && !e.repeat) sendEvent('pass'); }
-  else if(c==='Space'){ if(down && !e.repeat) sendEvent('shoot'); }
-  else hit=false;
+  var c = normCode(e.code);
+  // tus atama modu
+  if(listenAction && down){
+    e.preventDefault();
+    if(c!=='Escape') binds[listenAction] = c;
+    listenAction = null;
+    saveBinds(); renderKeyRows();
+    return;
+  }
+  var hit=false;
+  if(c===binds.u){ keys.u=down; hit=true; }
+  if(c===binds.d){ keys.d=down; hit=true; }
+  if(c===binds.l){ keys.l=down; hit=true; }
+  if(c===binds.r){ keys.r=down; hit=true; }
+  if(c===binds.s){ keys.s=down; hit=true; }
+  if(c===binds.pass){ if(down && !e.repeat) sendEvent('pass'); hit=true; }
+  if(c===binds.shoot){ if(down && !e.repeat) sendEvent('shoot'); hit=true; }
+  // yon oklari: baska bir eyleme atanmadiysa her zaman hareket
+  if(!hit){
+    if(c==='ArrowUp'){ keys.u=down; hit=true; }
+    else if(c==='ArrowDown'){ keys.d=down; hit=true; }
+    else if(c==='ArrowLeft'){ keys.l=down; hit=true; }
+    else if(c==='ArrowRight'){ keys.r=down; hit=true; }
+  }
   if(hit && running) e.preventDefault();
   if(hit) pushKeys();
 }
 document.addEventListener('keydown', function(e){ keySet(e,1); });
 document.addEventListener('keyup', function(e){ keySet(e,0); });
+
+function renderKeyRows(){
+  var host = el('keyRows');
+  host.innerHTML = '';
+  for(var a in DEF_BINDS){
+    (function(action){
+      var row = document.createElement('div'); row.className='keyRow';
+      var lab = document.createElement('span'); lab.textContent = BIND_LABELS[action];
+      var btn = document.createElement('button');
+      if(listenAction===action){ btn.textContent='Tuşa bas...'; btn.className='listen'; }
+      else btn.textContent = keyLabel(binds[action]);
+      btn.onclick = function(){ listenAction = action; renderKeyRows(); };
+      row.appendChild(lab); row.appendChild(btn);
+      host.appendChild(row);
+    })(a);
+  }
+}
 
 function pushKeys(){
   if(!running) return;
@@ -815,7 +933,23 @@ el('copyBtn').onclick = function(){
   }
 };
 
+el('keysBtn').onclick = function(){
+  var p = el('keyPanel');
+  var open = p.style.display==='block';
+  el('setPanel').style.display='none';
+  p.style.display = open ? 'none' : 'block';
+  if(!open) renderKeyRows();
+  listenAction = null;
+};
+
+el('keyReset').onclick = function(){
+  binds = JSON.parse(JSON.stringify(DEF_BINDS));
+  listenAction = null;
+  saveBinds(); renderKeyRows();
+};
+
 el('gearBtn').onclick = function(){
+  el('keyPanel').style.display='none';
   var p = el('setPanel');
   var open = p.style.display==='block';
   p.style.display = open ? 'none' : 'block';
