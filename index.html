@@ -32,7 +32,21 @@
   #joinRow { display:none; margin-top:10px; }
   #joinRow input { text-transform:uppercase; }
   #menuMsg { margin-top:12px; font-size:12px; color:#E5B356; min-height:16px; }
-  #gameWrap { display:none; flex-direction:column; align-items:center; margin-top:12px; }
+  #gameWrap { display:none; flex-direction:column; align-items:center; margin-top:12px; position:relative; }
+  #topRight { display:flex; align-items:center; gap:8px; }
+  .miniBtn { flex:0 0 auto; padding:5px 12px; font-size:12px; }
+  #setPanel { display:none; position:absolute; top:44px; right:0; z-index:10; width:250px;
+              background:#252E33; border:1px solid #3C4A52; border-radius:8px; padding:14px 16px;
+              box-shadow:0 6px 18px rgba(0,0,0,0.45); }
+  #setPanel label { display:block; font-size:12px; color:#9FB3BB; margin:8px 0 3px; }
+  #setPanel label span { color:#E5B356; font-weight:600; }
+  #setPanel input[type=password] { width:100%; padding:7px 9px; background:#1B2125; color:#E8E8E8;
+              border:1px solid #3C4A52; border-radius:4px; font-size:14px; outline:none; }
+  #setPanel input[type=range] { width:100%; height:20px; accent-color:#5B8C3E; }
+  #setPanel button { width:100%; margin-top:10px; padding:8px 0; font-size:13px; }
+  #pwMsg { font-size:11px; color:#E5B356; min-height:14px; margin-top:6px; }
+  #pauseBtn2 { background:#7A5C2E; }
+  #pauseBtn2:hover { background:#8F6C36; }
   #topBar { width:1000px; display:flex; align-items:center; justify-content:space-between;
             background:#252E33; border:1px solid #3C4A52; border-bottom:none;
             border-radius:8px 8px 0 0; padding:6px 14px; }
@@ -97,7 +111,26 @@
       <span style="color:#6E8089">-</span>
       <span id="scB">0</span><span class="tdot" style="background:#5689E5"></span>
     </div>
-    <div id="roomInfo"></div>
+    <div id="topRight">
+      <div id="roomInfo"></div>
+      <button class="miniBtn" id="copyBtn" style="display:none">Kopyala</button>
+      <button class="miniBtn" id="gearBtn">Ayarlar</button>
+    </div>
+  </div>
+  <div id="setPanel">
+    <div id="setLock">
+      <label>Ayarlar için şifre</label>
+      <input id="pwInp" type="password" maxlength="8" autocomplete="off">
+      <button class="primary" id="pwBtn">Aç</button>
+      <div id="pwMsg"></div>
+    </div>
+    <div id="setBody" style="display:none">
+      <label>Oyuncu hızı: <span id="gpVal">100%</span></label>
+      <input type="range" id="gpInp" min="50" max="200" step="10" value="100">
+      <label>Top hızı: <span id="gbVal">100%</span></label>
+      <input type="range" id="gbInp" min="50" max="200" step="10" value="100">
+      <button id="pauseBtn2">Maçı Durdur</button>
+    </div>
   </div>
   <canvas id="cv" width="1000" height="520"></canvas>
   <div id="botBar">
@@ -125,6 +158,9 @@ var TICK_MS = 1000/60, NET_MS = 1000/30;
 
 /* ================= DURUM ================= */
 var role = null;            // 'host' | 'client'
+var roomCode = null;        // kurulan/katilinan oda kodu
+var SET_PW = '0623';        // ayar paneli sifresi
+var setUnlocked = false;
 var peer = null, conns = {}, hostConn = null;
 var myPid = null, myName = 'Oyuncu';
 var teamSize = 3, maxGoals = 5;
@@ -152,7 +188,7 @@ function newPlayer(id, name, team, bot){
 
 function initGame(){
   G = { players:[], ball:{x:W/2,y:H/2,vx:0,vy:0}, score:[0,0],
-        phase:'play', ptimer:0, msg:'', over:false };
+        phase:'play', ptimer:0, msg:'', over:false, paused:false };
   // host oyuncusu kırmızı
   G.players.push(newPlayer(myPid, myName, 0, false));
   fillBots();
@@ -430,7 +466,9 @@ function startHost(withCode){
   var code = code5();
   peer = new Peer('ballclub-' + code);
   peer.on('open', function(){
-    el('roomInfo').textContent = withCode ? ('Oda Kodu: ' + code + ' (arkadaşına gönder)') : 'Yerel oyun';
+    roomCode = withCode ? code : null;
+    el('roomInfo').textContent = withCode ? ('Oda Kodu: ' + code) : 'Yerel oyun';
+    if(withCode) el('copyBtn').style.display = '';
     startGameUI();
   });
   peer.on('connection', function(conn){
@@ -464,6 +502,12 @@ function hostOnData(conn, msg){
   } else if(msg.t==='in'){
     var p = G.players.find(function(q){return q.id===conn.peer;});
     if(p) p.in = msg.k;
+  } else if(msg.t==='set'){
+    if(msg.pw===SET_PW){
+      if(typeof msg.sp==='number') SPD_P = Math.min(2, Math.max(0.5, msg.sp));
+      if(typeof msg.sb==='number') SPD_B = Math.min(2, Math.max(0.5, msg.sb));
+      if(msg.tp) G.paused = !G.paused;
+    }
   } else if(msg.t==='ev'){
     var p2 = G.players.find(function(q){return q.id===conn.peer;});
     if(p2) p2.ev.push(msg.a);
@@ -481,7 +525,7 @@ function broadcast(){
     p: G.players.map(function(p){ return { i:p.id, n:p.name, t:p.team, b:p.bot?1:0,
         x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
-    s: G.score, ph: G.phase, m: G.msg };
+    s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0 };
   for(var k in conns){ try{ conns[k].send(st); }catch(e){} }
 }
 
@@ -494,7 +538,8 @@ function startClient(code){
       hostConn.send({t:'hi', n:myName});
     });
     hostConn.on('data', function(msg){
-      if(msg.t==='wel'){ ok=true; myPid=msg.pid; startGameUI(); el('roomInfo').textContent='Odaya bağlı: '+code.toUpperCase(); }
+      if(msg.t==='wel'){ ok=true; myPid=msg.pid; roomCode=code.toUpperCase(); startGameUI();
+        el('roomInfo').textContent='Odaya bağlı: '+roomCode; el('copyBtn').style.display=''; }
       else if(msg.t==='st'){ G = msg; if(!Gr) Gr = JSON.parse(JSON.stringify(msg)); }
     });
     hostConn.on('close', function(){ if(running){ alert('Sunucuyla bağlantı koptu.'); location.reload(); } });
@@ -516,8 +561,11 @@ function loop(now){
   if(!running) return;
   var dtms = Math.min(50, now - lastT); lastT = now;
   if(role==='host'){
-    acc += dtms;
-    while(acc >= TICK_MS){ stepGame(1); acc -= TICK_MS; }
+    if(G.paused){ acc = 0; }
+    else {
+      acc += dtms;
+      while(acc >= TICK_MS){ stepGame(1); acc -= TICK_MS; }
+    }
     netAcc += dtms;
     if(netAcc >= NET_MS){ broadcast(); netAcc = 0; }
     render(hostView());
@@ -535,7 +583,7 @@ function loop(now){
       }
       Gr.p = Gr.p.filter(function(rp){ return G.p.some(function(tp){return tp.i===rp.i;}); });
       Gr.b[0] += (G.b[0]-Gr.b[0])*t; Gr.b[1] += (G.b[1]-Gr.b[1])*t;
-      Gr.s=G.s; Gr.ph=G.ph; Gr.m=G.m;
+      Gr.s=G.s; Gr.ph=G.ph; Gr.m=G.m; Gr.pa=G.pa;
       render(Gr);
     }
   }
@@ -544,7 +592,7 @@ function loop(now){
 
 function hostView(){
   return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0};}),
-           b:[G.ball.x,G.ball.y], s:G.score, ph:G.phase, m:G.msg };
+           b:[G.ball.x,G.ball.y], s:G.score, ph:G.phase, m:G.msg, pa:G.paused?1:0 };
 }
 
 /* ================= ÇİZİM ================= */
@@ -583,8 +631,17 @@ function render(v){
     ctx.textAlign='center';
     ctx.fillText((p.b?'[B] ':'')+p.n, p.x, p.y+PR+14);
   }
+  // duraklatma
+  if(v.pa){
+    ctx.fillStyle='rgba(27,33,37,0.6)';
+    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#FFFFFF'; ctx.font='bold 34px Segoe UI, Arial'; ctx.textAlign='center';
+    ctx.fillText('MAÇ DURDURULDU', W/2, H/2+12);
+  }
+  var pb2 = el('pauseBtn2');
+  pb2.textContent = v.pa ? 'Maçı Devam Ettir' : 'Maçı Durdur';
   // mesaj
-  if(v.m){
+  if(v.m && !v.pa){
     ctx.fillStyle='rgba(27,33,37,0.75)';
     ctx.fillRect(0, H/2-42, W, 84);
     ctx.fillStyle='#FFFFFF'; ctx.font='bold 34px Segoe UI, Arial'; ctx.textAlign='center';
@@ -694,6 +751,68 @@ el('joinGoBtn').onclick = function(){
   role='client';
   menuMsg('Bağlanılıyor...');
   startClient(code);
+};
+
+el('copyBtn').onclick = function(){
+  if(!roomCode) return;
+  var btn = this;
+  function done(){ btn.textContent='Kopyalandı!'; setTimeout(function(){ btn.textContent='Kopyala'; }, 1500); }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(roomCode).then(done, function(){ fallbackCopy(); done(); });
+  } else { fallbackCopy(); done(); }
+  function fallbackCopy(){
+    var ta=document.createElement('textarea'); ta.value=roomCode;
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta);
+  }
+};
+
+el('gearBtn').onclick = function(){
+  var p = el('setPanel');
+  var open = p.style.display==='block';
+  p.style.display = open ? 'none' : 'block';
+  if(!open){
+    el('setLock').style.display = setUnlocked ? 'none' : 'block';
+    el('setBody').style.display = setUnlocked ? 'block' : 'none';
+    if(!setUnlocked){ el('pwInp').value=''; el('pwMsg').textContent=''; el('pwInp').focus(); }
+    else syncPanel();
+  }
+};
+
+function syncPanel(){
+  el('gpInp').value = Math.round(SPD_P*100);
+  el('gbInp').value = Math.round(SPD_B*100);
+  el('gpVal').textContent = Math.round(SPD_P*100)+'%';
+  el('gbVal').textContent = Math.round(SPD_B*100)+'%';
+}
+
+el('pwBtn').onclick = function(){
+  if(el('pwInp').value === SET_PW){
+    setUnlocked = true;
+    el('setLock').style.display='none';
+    el('setBody').style.display='block';
+    syncPanel();
+  } else {
+    el('pwMsg').textContent = 'Yanlış şifre.';
+  }
+};
+el('pwInp').addEventListener('keydown', function(e){ if(e.key==='Enter') el('pwBtn').onclick(); e.stopPropagation(); });
+
+function applyLive(){
+  var sp = parseInt(el('gpInp').value,10)/100;
+  var sb = parseInt(el('gbInp').value,10)/100;
+  el('gpVal').textContent = Math.round(sp*100)+'%';
+  el('gbVal').textContent = Math.round(sb*100)+'%';
+  if(role==='host'){ SPD_P=sp; SPD_B=sb; }
+  else if(hostConn && hostConn.open){ SPD_P=sp; SPD_B=sb; hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb}); }
+}
+el('gpInp').oninput = applyLive;
+el('gbInp').oninput = applyLive;
+
+el('pauseBtn2').onclick = function(){
+  if(role==='host'){ G.paused = !G.paused; }
+  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, tp:1}); }
 };
 
 el('pspdInp').oninput = function(){ el('pspdVal').textContent = this.value + '%'; };
