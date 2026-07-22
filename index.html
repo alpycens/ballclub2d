@@ -196,7 +196,7 @@ var PX0 = 55, PX1 = 945, PY0 = 55, PY1 = 465;      // saha çizgileri
 var GOAL_H = 150, GY0 = (PY0+PY1)/2 - GOAL_H/2, GY1 = (PY0+PY1)/2 + GOAL_H/2;
 var fieldSize = 'big';
 var GOAL_DEPTH = 34;
-var PR = 15, BR = 8;                                // yarıçaplar
+var PR = 15, BR = 8, POST_R = 6;                    // yarıçaplar (POST_R: kale diregi)
 var KICK_RANGE = PR + BR + 6;
 var ACC = 0.30, PDAMP = 0.925, BASE_MAX = 2.55, SPRINT_MAX = 3.7;
 var BDAMP = 0.992, BOUNCE = 0.82;
@@ -239,6 +239,7 @@ function rnd(a,b){ return a + Math.random()*(b-a); }
 function dist(a,b){ var dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
 function code5(){ var c='ABCDEFGHJKLMNPRSTUVYZ123456789', s=''; for(var i=0;i<5;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
 function el(id){ return document.getElementById(id); }
+function goalPosts(){ return [[PX0,GY0],[PX0,GY1],[PX1,GY0],[PX1,GY1]]; }
 
 /* ================= OYUN KURULUMU (HOST) ================= */
 function newPlayer(id, name, team, bot){
@@ -353,6 +354,20 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     if(p.y < PR) { p.y = PR; p.vy = 0; }
     if(p.y > H-PR) { p.y = H-PR; p.vy = 0; }
 
+    // direge takilma: oyuncu diregin icinden gecemez
+    var pposts = goalPosts();
+    for(var gp=0; gp<4; gp++){
+      var pdx = p.x - pposts[gp][0], pdy = p.y - pposts[gp][1];
+      var pd = Math.sqrt(pdx*pdx + pdy*pdy);
+      if(pd > 0 && pd < POST_R + PR){
+        var pnx = pdx/pd, pny = pdy/pd;
+        p.x = pposts[gp][0] + pnx*(POST_R+PR);
+        p.y = pposts[gp][1] + pny*(POST_R+PR);
+        var pvn = p.vx*pnx + p.vy*pny;
+        if(pvn < 0){ p.vx -= pvn*pnx; p.vy -= pvn*pny; }
+      }
+    }
+
     // baslama vurusu: top oyuna girene dek herkes kendi yarisinda,
     // rakip takim orta yuvarlaga da giremez
     if(G.ko && play){
@@ -435,6 +450,23 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
       }
     }
 
+    // top - direk çarpışması: direğe çarpan top seker
+    var bposts = goalPosts();
+    for(var gb=0; gb<4; gb++){
+      var bpx = ball.x - bposts[gb][0], bpy = ball.y - bposts[gb][1];
+      var bpd = Math.sqrt(bpx*bpx + bpy*bpy);
+      if(bpd > 0 && bpd < POST_R + BR){
+        var bnx = bpx/bpd, bny = bpy/bpd;
+        ball.x = bposts[gb][0] + bnx*(POST_R+BR);
+        ball.y = bposts[gb][1] + bny*(POST_R+BR);
+        var bvn = ball.vx*bnx + ball.vy*bny;
+        if(bvn < 0){
+          ball.vx -= (1+BOUNCE)*bvn*bnx;
+          ball.vy -= (1+BOUNCE)*bvn*bny;
+        }
+      }
+    }
+
     // top duvarları: üst/alt saha çizgisi, sol/sağ kale ağzı hariç
     if(ball.y < PY0+BR){ ball.y = PY0+BR; ball.vy = -ball.vy*BOUNCE; }
     if(ball.y > PY1-BR){ ball.y = PY1-BR; ball.vy = -ball.vy*BOUNCE; }
@@ -480,16 +512,9 @@ function tryKick(p, kind){
   var ball=G.ball;
   if(dist(p, ball) > KICK_RANGE) return false;
   var tx, ty, spd;
-  if(kind==='pass'){
-    var mate = nearestMate(p);
-    if(mate){ tx = mate.x - ball.x; ty = mate.y - ball.y; }
-    else { tx = ball.x - p.x; ty = ball.y - p.y; }
-    spd = PASS_SPD;
-  } else {
-    // haxball tarzi: top, oyuncunun neresinden vurulduysa o yone gider
-    tx = ball.x - p.x; ty = ball.y - p.y;
-    spd = SHOOT_SPD;
-  }
+  // her iki vurus da saf fizik: kuvvet, oyuncu merkezinden temas noktasina dogru uygulanir
+  tx = ball.x - p.x; ty = ball.y - p.y;
+  spd = (kind==='pass') ? PASS_SPD : SHOOT_SPD;
   if(tx===0 && ty===0){ tx = p.team===0?1:-1; ty = 0; }
   var l = Math.sqrt(tx*tx+ty*ty) || 1;
   spd *= SPD_B;
@@ -556,16 +581,16 @@ function botThink(){
       }
 
       if(hasBall){
-        if(p===keeper){
-          // kaleci topu uzaklastirir: rakip yari sahaya
-          kickToward(p, t===0 ? W*0.72 : W*0.28, PY0 + rnd(0.2,0.8)*(PY1-PY0), SHOOT_SPD);
-          slot++;
-          continue;
-        }
-        // insan takım arkadaşı pas istedi mi?
+        // insan takım arkadaşı pas istedi mi? (kaleci dahil herkes cevap verir)
         var req = null;
         for(var j=0;j<team.length;j++)
           if(!team[j].bot && team[j].passReq>0 && team[j]!==p){ req=team[j]; break; }
+        if(p===keeper){
+          if(req){ kickToward(p, req.x, req.y, PASS_SPD); req.passReq=0; }
+          else kickToward(p, t===0 ? W*0.72 : W*0.28, PY0 + rnd(0.2,0.8)*(PY1-PY0), SHOOT_SPD);
+          slot++;
+          continue;
+        }
         var gx = t===0?PX1:PX0, gy=(GY0+GY1)/2;
         if(req){
           kickToward(p, req.x, req.y, PASS_SPD); req.passReq=0;
@@ -858,9 +883,9 @@ function drawGoal(x, dir){
     ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(back,yy); ctx.stroke();
   }
   // direkler
-  ctx.fillStyle='#FFFFFF';
-  ctx.beginPath(); ctx.arc(x,GY0,5,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x,GY1,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#FFFFFF'; ctx.strokeStyle='#1B2125'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(x,GY0,POST_R,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x,GY1,POST_R,0,Math.PI*2); ctx.fill(); ctx.stroke();
 }
 
 /* ================= SOHBET ================= */
