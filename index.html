@@ -170,8 +170,6 @@
       <input type="range" id="gpInp" min="50" max="200" step="10" value="100">
       <label>Top hızı: <span id="gbVal">100%</span></label>
       <input type="range" id="gbInp" min="50" max="200" step="10" value="100">
-      <label>İmleç dönüş hızı: <span id="gaVal">100%</span></label>
-      <input type="range" id="gaInp" min="20" max="300" step="10" value="100">
       <button id="pauseBtn2">Maçı Durdur</button>
     </div>
   </div>
@@ -205,7 +203,6 @@ var BDAMP = 0.992, BOUNCE = 0.82;
 var SHOOT_SPD = 9.5, PASS_SPD = 6.8;
 var STAM_MAX = 100, STAM_DRAIN = 38, STAM_REGEN = 17, STAM_UNLOCK = 25;
 var SPD_P = 1, SPD_B = 1;                           // ayarlar: oyuncu / top hizi carpani
-var AIM_BASE = 0.14, AIM_M = 1;                     // imlec (nisan) donus hizi rad/kare ve carpani
 var TICK_MS = 1000/60, NET_MS = 1000/30;
 
 /* ================= DURUM ================= */
@@ -218,7 +215,7 @@ var myPid = null, myName = 'Oyuncu';
 var teamSize = 3, maxGoals = 5, myTeamPref = 'auto';
 var G = null;               // oyun durumu (host'ta gerçek, client'ta hedef)
 var Gr = null;              // client render (yumuşatılmış)
-var keys = { u:0, d:0, l:0, r:0, s:0 };
+var keys = { u:0, d:0, l:0, r:0, s:0, x:0, sp:0 };
 var lastSentKeys = '';
 var running = false, lastT = 0, acc = 0, netAcc = 0;
 
@@ -246,7 +243,7 @@ function el(id){ return document.getElementById(id); }
 /* ================= OYUN KURULUMU (HOST) ================= */
 function newPlayer(id, name, team, bot){
   return { id:id, name:name, team:team, bot:bot,
-           x:0, y:0, vx:0, vy:0, fx: team===0?1:-1, fy:0, aim: team===0?0:Math.PI,
+           x:0, y:0, vx:0, vy:0,
            stamina:STAM_MAX, lock:false, kcd:0, passReq:0, flash:0,
            in:{u:0,d:0,l:0,r:0,s:0}, ev:[] };
 }
@@ -299,8 +296,7 @@ function resetPositions(){
       var frac = (i+1)/(team.length+1);
       p.y = PY0 + frac*(PY1-PY0);
       p.x = t===0 ? PX0 + 130 + (i%2)*70 : PX1 - 130 - (i%2)*70;
-      p.vx = 0; p.vy = 0; p.aim = t===0?0:Math.PI;
-      p.fx = Math.cos(p.aim); p.fy = Math.sin(p.aim);
+      p.vx = 0; p.vy = 0;
     }
   }
 }
@@ -327,22 +323,12 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     p.kcd = Math.max(0, p.kcd - dt*TICK_MS);
     p.passReq = Math.max(0, p.passReq - dt*TICK_MS);
     p.flash = Math.max(0, p.flash - dt*TICK_MS);
-    var inp = play ? p.in : {u:0,d:0,l:0,r:0,s:0};
+    p.glow = !p.bot && !!(p.in.s || p.in.x || p.in.sp);
+    var inp = (play || G.phase==='goal') ? p.in : {u:0,d:0,l:0,r:0,s:0};
     var mx = (inp.r?1:0) - (inp.l?1:0);
     var my = (inp.d?1:0) - (inp.u?1:0);
     var moving = (mx!==0 || my!==0);
-    if(moving){
-      var mlen=Math.sqrt(mx*mx+my*my); mx/=mlen; my/=mlen;
-      // nisan noktasi 360 derece yumusak doner; hizi AIM_M ile ayarlanir
-      var tgt = Math.atan2(my, mx);
-      var diff = tgt - p.aim;
-      while(diff > Math.PI) diff -= Math.PI*2;
-      while(diff < -Math.PI) diff += Math.PI*2;
-      var step = AIM_BASE * AIM_M * dt;
-      if(Math.abs(diff) <= step) p.aim = tgt;
-      else p.aim += (diff>0?1:-1)*step;
-      p.fx = Math.cos(p.aim); p.fy = Math.sin(p.aim);
-    }
+    if(moving){ var mlen=Math.sqrt(mx*mx+my*my); mx/=mlen; my/=mlen; }
 
     // sprint / stamina
     var sprinting = inp.s && moving && !p.lock && p.stamina>0;
@@ -497,14 +483,14 @@ function tryKick(p, kind){
   if(kind==='pass'){
     var mate = nearestMate(p);
     if(mate){ tx = mate.x - ball.x; ty = mate.y - ball.y; }
-    else { tx = p.fx; ty = p.fy; }
+    else { tx = ball.x - p.x; ty = ball.y - p.y; }
     spd = PASS_SPD;
   } else {
-    // şut: yön tuşu basılıysa o yöne, değilse rakip kaleye
-    if(p.fx!==0 || p.fy!==0){ tx=p.fx; ty=p.fy; }
-    else { tx = (p.team===0?PX1:PX0) - ball.x; ty = (GY0+GY1)/2 - ball.y; }
+    // haxball tarzi: top, oyuncunun neresinden vurulduysa o yone gider
+    tx = ball.x - p.x; ty = ball.y - p.y;
     spd = SHOOT_SPD;
   }
+  if(tx===0 && ty===0){ tx = p.team===0?1:-1; ty = 0; }
   var l = Math.sqrt(tx*tx+ty*ty) || 1;
   spd *= SPD_B;
   ball.vx = tx/l*spd; ball.vy = ty/l*spd;
@@ -678,7 +664,6 @@ function hostOnData(conn, msg){
     if(msg.pw===SET_PW){
       if(typeof msg.sp==='number') SPD_P = Math.min(2, Math.max(0.5, msg.sp));
       if(typeof msg.sb==='number') SPD_B = Math.min(2, Math.max(0.5, msg.sb));
-      if(typeof msg.am==='number') AIM_M = Math.min(3, Math.max(0.2, msg.am));
       if(msg.tp) G.paused = !G.paused;
     }
   } else if(msg.t==='chat'){
@@ -711,9 +696,9 @@ function broadcast(){
   var st = { t:'st',
     p: G.players.map(function(p){ return { i:p.id, n:p.name, t:p.team, b:p.bot?1:0,
         x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0,
-        fx:Math.round(p.fx*100)/100, fy:Math.round(p.fy*100)/100, fl:p.flash>0?1:0 }; }),
+        fl:(p.flash>0 || p.glow)?1:0 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
-    s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,AIM_M],
+    s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B],
     ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam };
   for(var k in conns){ try{ conns[k].send(st); }catch(e){} }
 }
@@ -732,7 +717,7 @@ function startClient(code){
       else if(msg.t==='chatb'){ addChat(msg.n, msg.tm, msg.x, !!msg.sy); }
       else if(msg.t==='st'){
         G = msg;
-        if(msg.cf){ SPD_P=msg.cf[0]; SPD_B=msg.cf[1]; AIM_M=msg.cf[2]; }
+        if(msg.cf){ SPD_P=msg.cf[0]; SPD_B=msg.cf[1]; }
         if(!Gr) Gr = JSON.parse(JSON.stringify(msg));
       }
     });
@@ -774,8 +759,6 @@ function loop(now){
         if(!rp){ Gr.p.push(JSON.parse(JSON.stringify(tp))); continue; }
         rp.x += (tp.x-rp.x)*t; rp.y += (tp.y-rp.y)*t;
         rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fl=tp.fl;
-        if(typeof rp.fx!=='number'){ rp.fx=tp.fx; rp.fy=tp.fy; }
-        rp.fx += (tp.fx-rp.fx)*t; rp.fy += (tp.fy-rp.fy)*t;
       }
       Gr.p = Gr.p.filter(function(rp){ return G.p.some(function(tp){return tp.i===rp.i;}); });
       Gr.b[0] += (G.b[0]-Gr.b[0])*t; Gr.b[1] += (G.b[1]-Gr.b[1])*t;
@@ -787,7 +770,7 @@ function loop(now){
 }
 
 function hostView(){
-  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fx:p.fx,fy:p.fy,fl:p.flash>0?1:0};}),
+  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0};}),
            b:[G.ball.x,G.ball.y], s:G.score, ph:G.phase, m:G.msg, pa:G.paused?1:0,
            ko:(G.ko && G.phase==='play')?1:0, kt:G.koTeam };
 }
@@ -819,20 +802,11 @@ function render(v){
   for(var i=0;i<v.p.length;i++){
     var p=v.p[i];
     var me = (p.i===myPid);
-    var flash = !!p.fl; // sadece topa vurulan anda yanar
+    var flash = !!p.fl; // vurusta veya X/Space/Shift basiliyken yanar
     ctx.fillStyle = p.t===0 ? '#E56E56' : '#5689E5';
     ctx.strokeStyle = flash ? '#FFFFFF' : '#1B2125';
     ctx.lineWidth = flash ? 3.5 : 2;
     ctx.beginPath(); ctx.arc(p.x,p.y,PR,0,Math.PI*2); ctx.fill(); ctx.stroke();
-    if(me){
-      // dairesel imlec + bakis yonu noktasi
-      var fl = Math.sqrt((p.fx||0)*(p.fx||0)+(p.fy||0)*(p.fy||0)) || 1;
-      var fnx=(p.fx||1)/fl, fny=(p.fy||0)/fl;
-      ctx.strokeStyle='rgba(255,255,255,0.45)'; ctx.lineWidth=1.5;
-      ctx.beginPath(); ctx.arc(p.x,p.y,PR+7,0,Math.PI*2); ctx.stroke();
-      ctx.fillStyle='#FFFFFF';
-      ctx.beginPath(); ctx.arc(p.x+fnx*(PR+7), p.y+fny*(PR+7), 3.2, 0, Math.PI*2); ctx.fill();
-    }
     ctx.fillStyle = me ? '#FFFFFF' : 'rgba(255,255,255,0.85)';
     ctx.font = (me?'bold ':'')+'11px Segoe UI, Arial';
     ctx.textAlign='center';
@@ -990,8 +964,8 @@ function keySet(e, down){
   if(c===binds.l){ keys.l=down; hit=true; }
   if(c===binds.r){ keys.r=down; hit=true; }
   if(c===binds.s){ keys.s=down; hit=true; }
-  if(c===binds.pass){ if(down && !e.repeat) sendEvent('pass'); hit=true; }
-  if(c===binds.shoot){ if(down && !e.repeat) sendEvent('shoot'); hit=true; }
+  if(c===binds.pass){ keys.x=down; if(down && !e.repeat) sendEvent('pass'); hit=true; }
+  if(c===binds.shoot){ keys.sp=down; if(down && !e.repeat) sendEvent('shoot'); hit=true; }
   // yon oklari: baska bir eyleme atanmadiysa her zaman hareket
   if(!hit){
     if(c==='ArrowUp'){ keys.u=down; hit=true; }
@@ -1026,12 +1000,12 @@ function pushKeys(){
   if(!running) return;
   if(role==='host'){
     var p = G && G.players.find(function(q){return q.id===myPid;});
-    if(p) p.in = {u:keys.u,d:keys.d,l:keys.l,r:keys.r,s:keys.s};
+    if(p) p.in = {u:keys.u,d:keys.d,l:keys.l,r:keys.r,s:keys.s,x:keys.x,sp:keys.sp};
   } else if(hostConn && hostConn.open){
-    var s = ''+keys.u+keys.d+keys.l+keys.r+keys.s;
+    var s = ''+keys.u+keys.d+keys.l+keys.r+keys.s+keys.x+keys.sp;
     if(s!==lastSentKeys){
       lastSentKeys=s;
-      hostConn.send({t:'in', k:{u:keys.u,d:keys.d,l:keys.l,r:keys.r,s:keys.s}});
+      hostConn.send({t:'in', k:{u:keys.u,d:keys.d,l:keys.l,r:keys.r,s:keys.s,x:keys.x,sp:keys.sp}});
     }
   }
 }
@@ -1134,10 +1108,8 @@ el('gearBtn').onclick = function(){
 function syncPanel(){
   el('gpInp').value = Math.round(SPD_P*100);
   el('gbInp').value = Math.round(SPD_B*100);
-  el('gaInp').value = Math.round(AIM_M*100);
   el('gpVal').textContent = Math.round(SPD_P*100)+'%';
   el('gbVal').textContent = Math.round(SPD_B*100)+'%';
-  el('gaVal').textContent = Math.round(AIM_M*100)+'%';
 }
 
 el('pwBtn').onclick = function(){
@@ -1155,16 +1127,13 @@ el('pwInp').addEventListener('keydown', function(e){ if(e.key==='Enter') el('pwB
 function applyLive(){
   var sp = parseInt(el('gpInp').value,10)/100;
   var sb = parseInt(el('gbInp').value,10)/100;
-  var am = parseInt(el('gaInp').value,10)/100;
   el('gpVal').textContent = Math.round(sp*100)+'%';
   el('gbVal').textContent = Math.round(sb*100)+'%';
-  el('gaVal').textContent = Math.round(am*100)+'%';
-  if(role==='host'){ SPD_P=sp; SPD_B=sb; AIM_M=am; }
-  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, am:am}); }
+  if(role==='host'){ SPD_P=sp; SPD_B=sb; }
+  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb}); }
 }
 el('gpInp').oninput = applyLive;
 el('gbInp').oninput = applyLive;
-el('gaInp').oninput = applyLive;
 
 el('pauseBtn2').onclick = function(){
   if(role==='host'){ G.paused = !G.paused; }
