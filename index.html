@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HaxBot - Botlu Haxball</title>
+<title>BallClub2D</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -48,8 +48,8 @@
 <body>
 
 <div id="menu">
-  <h1>HAXBOT</h1>
-  <div class="sub">Botlu Haxball · WASD/Yön hareket · X pas · Space şut · Shift sprint</div>
+  <h1>BALLCLUB2D</h1>
+  <div class="sub">Botlu 2D futbol · WASD/Yön hareket · X pas · Space şut · Shift sprint</div>
   <label>Takma adın</label>
   <input id="nameInp" maxlength="14" placeholder="Alperen">
   <label>Takım boyutu (botlar kalanı doldurur)</label>
@@ -412,7 +412,7 @@ function kickToward(p, tx, ty, spd){
 /* ================= AĞ ================= */
 function startHost(withCode){
   var code = code5();
-  peer = new Peer('haxbot-' + code);
+  peer = new Peer('ballclub-' + code);
   peer.on('open', function(){
     el('roomInfo').textContent = withCode ? ('Oda Kodu: ' + code + ' (arkadaşına gönder)') : 'Yerel oyun';
     startGameUI();
@@ -472,7 +472,7 @@ function broadcast(){
 function startClient(code){
   peer = new Peer();
   peer.on('open', function(){
-    hostConn = peer.connect('haxbot-' + code.toUpperCase(), {reliable:true});
+    hostConn = peer.connect('ballclub-' + code.toUpperCase(), {reliable:true});
     var ok=false;
     hostConn.on('open', function(){
       hostConn.send({t:'hi', n:myName});
