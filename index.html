@@ -85,6 +85,55 @@
   #chatSend { flex:0 0 auto; width:90px; padding:7px 0; font-size:13px; }
   #leaveBtn { flex:0 0 auto; width:110px; padding:6px 0; font-size:12px; background:#7A3C3C; }
   #leaveBtn:hover { background:#914848; }
+
+  /* olcekleme */
+  #gameScale { transform-origin: top center; }
+  #fsBtn { flex:0 0 auto; padding:5px 12px; font-size:12px; }
+
+  /* LOBI */
+  #lobby { display:none; margin-top:24px; width:860px; }
+  #lobby h1 { font-size:24px; letter-spacing:1px; color:#CDE6B4; }
+  #lobHead { display:flex; align-items:center; justify-content:space-between;
+             background:#252E33; border:1px solid #3C4A52; border-radius:8px 8px 0 0;
+             padding:10px 16px; }
+  #lobCode { font-size:13px; color:#9FB3BB; }
+  #lobCode b { color:#E5B356; font-size:16px; letter-spacing:2px; user-select:all; }
+  #lobCols { display:flex; gap:0; background:#252E33; border:1px solid #3C4A52; border-top:none; }
+  .lobCol { flex:1; min-height:230px; padding:10px 12px; border-right:1px solid #3C4A52; }
+  .lobCol:last-child { border-right:none; }
+  .lobColHead { font-size:13px; font-weight:700; letter-spacing:1px; padding-bottom:8px;
+                margin-bottom:8px; border-bottom:2px solid #3C4A52; }
+  .lobColHead.red { color:#E56E56; border-color:#E56E56; }
+  .lobColHead.blue { color:#5689E5; border-color:#5689E5; }
+  .lobColHead.spec { color:#9FB3BB; }
+  .lobSlot { display:flex; align-items:center; gap:6px; padding:5px 7px; margin:4px 0;
+             background:#1B2125; border:1px solid #3C4A52; border-radius:5px; font-size:13px; }
+  .lobSlot.me { border-color:#CDE6B4; }
+  .lobSlot .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lobSlot .tag { font-size:10px; padding:1px 5px; border-radius:3px; background:#3C4A52; color:#CDE6B4; }
+  .lobSlot .tag.gk { background:#5B6E2E; color:#E8F0D8; }
+  .lobSlot .xb { flex:0 0 auto; width:22px; padding:2px 0; font-size:12px; background:#7A3C3C; line-height:1; }
+  .lobBtns { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .lobBtns button { flex:0 0 auto; padding:5px 10px; font-size:12px; }
+  #lobCtrls { background:#252E33; border:1px solid #3C4A52; border-top:none;
+              border-radius:0 0 8px 8px; padding:12px 16px; }
+  #lobCfg { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
+  #lobCfg .cfgItem { display:flex; flex-direction:column; gap:3px; }
+  #lobCfg label { font-size:11px; color:#9FB3BB; margin:0; }
+  #lobCfg select { padding:6px 8px; background:#1B2125; color:#E8E8E8; border:1px solid #3C4A52;
+                   border-radius:4px; font-size:13px; }
+  #lobStart { margin-left:auto; padding:10px 26px; font-size:15px; font-weight:700; background:#5B8C3E; }
+  #lobStart:hover { background:#6BA34B; }
+  #lobStart:disabled { background:#3C4A52; color:#7E8C94; cursor:default; }
+  .hostOnly.hidden { display:none; }
+  #lobChat { margin-top:10px; background:#252E33; border:1px solid #3C4A52; border-radius:8px; padding:8px 12px; }
+  #lchatLog { height:90px; overflow-y:auto; font-size:13px; line-height:1.4; margin-bottom:6px; }
+  #lchatRow { display:flex; gap:8px; }
+  #lchatInp { flex:1; padding:7px 10px; background:#1B2125; color:#E8E8E8; border:1px solid #3C4A52;
+              border-radius:4px; font-size:13px; outline:none; }
+  #lchatInp:focus { border-color:#CDE6B4; }
+  #lchatSend { flex:0 0 auto; width:90px; padding:7px 0; font-size:13px; }
+  #lobMsg { font-size:12px; color:#E5B356; min-height:16px; margin-top:6px; }
 </style>
 </head>
 <body>
@@ -94,48 +143,12 @@
   <div class="sub">Botlu 2D futbol · WASD/Yön hareket · X pas · Space şut · Shift sprint</div>
   <label>Takma adın</label>
   <input id="nameInp" maxlength="14" placeholder="Alperen">
-  <label>Takım</label>
-  <select id="teamSel">
-    <option value="auto" selected>Otomatik</option>
-    <option value="0">Kırmızı</option>
-    <option value="1">Mavi</option>
-  </select>
-  <label>Takım boyutu (botlar kalanı doldurur)</label>
-  <select id="sizeSel">
-    <option value="2">2v2</option>
-    <option value="3" selected>3v3</option>
-    <option value="4">4v4</option>
-  </select>
-  <label>Saha boyutu</label>
-  <select id="fieldSel">
-    <option value="small">Small</option>
-    <option value="big" selected>Big</option>
-    <option value="huge">Huge</option>
-  </select>
-  <label>Bot zorluğu</label>
-  <select id="diffSel">
-    <option value="0">Kolay</option>
-    <option value="1" selected>Normal</option>
-    <option value="2">Zor</option>
-  </select>
-  <label>Maç kaç golde biter</label>
-  <select id="goalSel">
-    <option value="3">3 gol</option>
-    <option value="5" selected>5 gol</option>
-    <option value="10">10 gol</option>
-  </select>
-  <div id="settings">
-    <div class="settitle">AYARLAR</div>
-    <label>Oyuncu hızı: <span id="pspdVal">100%</span></label>
-    <input type="range" id="pspdInp" min="50" max="200" step="10" value="100">
-    <label>Top hızı: <span id="bspdVal">100%</span></label>
-    <input type="range" id="bspdInp" min="50" max="200" step="10" value="100">
-  </div>
   <div class="btnrow">
-    <button class="primary" id="soloBtn">Botlara Karşı</button>
+    <button class="primary" id="soloBtn">Tek Başına</button>
     <button class="primary" id="hostBtn">Oda Kur</button>
     <button id="joinBtn">Odaya Katıl</button>
   </div>
+  <div class="sub" style="margin-top:10px">Oda kurup arkadaşların katıldıktan sonra takım/mevki seçip botları ayarlar ve maçı başlatırsın.</div>
   <div id="joinRow">
     <label>Oda kodu</label>
     <input id="codeInp" maxlength="5" placeholder="ABC12">
@@ -144,7 +157,68 @@
   <div id="menuMsg"></div>
 </div>
 
+<div id="lobby">
+  <div id="lobHead">
+    <h1>ODA</h1>
+    <div id="lobCode"></div>
+  </div>
+  <div id="lobCols">
+    <div class="lobCol">
+      <div class="lobColHead red">KIRMIZI</div>
+      <div id="colRed"></div>
+      <div class="lobBtns">
+        <button id="joinRedBtn">Kırmızı'ya Geç</button>
+        <button class="hostOnly" id="addRedBtn">+ Bot</button>
+      </div>
+    </div>
+    <div class="lobCol">
+      <div class="lobColHead spec">SEYİRCİ</div>
+      <div id="colSpec"></div>
+      <div class="lobBtns">
+        <button id="joinSpecBtn">Seyirciye Geç</button>
+      </div>
+    </div>
+    <div class="lobCol">
+      <div class="lobColHead blue">MAVİ</div>
+      <div id="colBlue"></div>
+      <div class="lobBtns">
+        <button id="joinBlueBtn">Mavi'ye Geç</button>
+        <button class="hostOnly" id="addBlueBtn">+ Bot</button>
+      </div>
+    </div>
+  </div>
+  <div id="lobCtrls">
+    <div id="lobCfg">
+      <div class="cfgItem"><label>Mevkim</label>
+        <select id="posSel"><option value="fld">Oyuncu</option><option value="gk">Kaleci</option></select>
+      </div>
+      <div class="cfgItem hostOnly"><label>Saha</label>
+        <select id="lfieldSel"><option value="small">Small</option><option value="big" selected>Big</option><option value="huge">Huge</option></select>
+      </div>
+      <div class="cfgItem hostOnly"><label>Bot tarzı</label>
+        <select id="lstyleSel"><option value="0">Defansif</option><option value="1" selected>Dengeli</option><option value="2">Ofansif</option></select>
+      </div>
+      <div class="cfgItem hostOnly"><label>Bot zorluğu</label>
+        <select id="ldiffSel"><option value="0">Kolay</option><option value="1" selected>Normal</option><option value="2">Zor</option></select>
+      </div>
+      <div class="cfgItem hostOnly"><label>Bitiş golü</label>
+        <select id="lgoalSel"><option value="3">3</option><option value="5" selected>5</option><option value="10">10</option></select>
+      </div>
+      <button class="hostOnly" id="lobStart">Maçı Başlat</button>
+    </div>
+    <div id="lobMsg"></div>
+  </div>
+  <div id="lobChat">
+    <div id="lchatLog"></div>
+    <div id="lchatRow">
+      <input id="lchatInp" maxlength="120" placeholder="Mesaj yaz..." autocomplete="off">
+      <button class="primary" id="lchatSend">Gönder</button>
+    </div>
+  </div>
+</div>
+
 <div id="gameWrap">
+ <div id="gameScale">
   <div id="topBar">
     <div id="scoreBox">
       <span class="tdot" style="background:#E56E56"></span><span id="scR">0</span>
@@ -156,6 +230,7 @@
       <button class="miniBtn" id="copyBtn" style="display:none">Kopyala</button>
       <button class="miniBtn" id="keysBtn">Tuşlar</button>
       <button class="miniBtn" id="gearBtn">Ayarlar</button>
+      <button class="miniBtn" id="fsBtn">Tam Ekran</button>
     </div>
   </div>
   <div id="keyPanel">
@@ -176,6 +251,12 @@
       <input type="range" id="gpInp" min="50" max="200" step="10" value="100">
       <label>Top hızı: <span id="gbVal">100%</span></label>
       <input type="range" id="gbInp" min="50" max="200" step="10" value="100">
+      <label>Bot tarzı</label>
+      <select id="gstSel" style="width:100%;padding:7px 9px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:13px">
+        <option value="0">Defansif</option>
+        <option value="1">Dengeli</option>
+        <option value="2">Ofansif</option>
+      </select>
       <label>Bot zorluğu</label>
       <select id="gdSel" style="width:100%;padding:7px 9px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:13px">
         <option value="0">Kolay</option>
@@ -198,6 +279,7 @@
       <button class="primary" id="chatSend">Gönder</button>
     </div>
   </div>
+ </div>
 </div>
 
 <script>
@@ -216,6 +298,11 @@ var SHOOT_SPD = 9.5, PASS_SPD = 6.8;
 var STAM_MAX = 100, STAM_DRAIN = 38, STAM_REGEN = 17, STAM_UNLOCK = 25;
 var SPD_P = 1, SPD_B = 1;                           // ayarlar: oyuncu / top hizi carpani
 var BOT_DIFF = 1;                                   // 0 kolay, 1 normal, 2 zor
+var BOT_STYLE = 1;                                  // 0 defansif, 1 dengeli, 2 ofansif
+var STYLE_HOME = [130, 205, 300];                   // botun kendi kalesinden ileri uzakligi
+var STYLE_PUSH = [0.25, 0.42, 0.60];                // topun konumuna gore ileri kayma
+var PEN_W = 114, PEN_EXT = 45;                      // ceza sahasi: derinlik ve kale ustu/alti tasma
+var LOBBY = { roster:[], cfg:{ field:'big', goals:5, style:1, diff:1 }, started:false };
 var DIFFS = [
   { spd:0.75, aimErr:0.55, shootRange:230, sprint:false, kcd:650, keepErr:34 },  // kolay
   { spd:1.0,  aimErr:0.32, shootRange:320, sprint:true,  kcd:350, keepErr:12 },  // normal
@@ -230,12 +317,21 @@ var SET_PW = '0623';        // ayar paneli sifresi
 var setUnlocked = false;
 var peer = null, conns = {}, hostConn = null;
 var myPid = null, myName = 'Oyuncu';
-var teamSize = 3, maxGoals = 5, myTeamPref = 'auto';
+var maxGoals = 5;
 var G = null;               // oyun durumu (host'ta gerçek, client'ta hedef)
 var Gr = null;              // client render (yumuşatılmış)
 var keys = { u:0, d:0, l:0, r:0, s:0, x:0, sp:0 };
 var lastSentKeys = '';
 var running = false, lastT = 0, acc = 0, netAcc = 0;
+
+var PEER_OPTS = {
+  debug: 0,
+  config: { iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
+  ]}
+};
 
 var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 
@@ -246,10 +342,13 @@ function setField(fs){
   else { fieldSize='big'; W=1000; H=520; GOAL_H=150; }
   PX0=55; PX1=W-55; PY0=55; PY1=H-55;
   GY0=(PY0+PY1)/2-GOAL_H/2; GY1=(PY0+PY1)/2+GOAL_H/2;
+  PEN_W = Math.round((PX1-PX0)*0.13);
+  PEN_EXT = Math.round(GOAL_H*0.3);
   if(cv){ cv.width=W; cv.height=H; }
   el('topBar').style.width=W+'px';
   el('botBar').style.width=W+'px';
   el('chatWrap').style.width=W+'px';
+  var gs=el('gameScale'); if(gs) gs.style.width=W+'px';
 }
 
 /* ================= YARDIMCI ================= */
@@ -260,48 +359,38 @@ function el(id){ return document.getElementById(id); }
 function goalPosts(){ return [[PX0,GY0],[PX0,GY1],[PX1,GY0],[PX1,GY1]]; }
 
 /* ================= OYUN KURULUMU (HOST) ================= */
+function penBox(t){
+  return t===0
+    ? { x0:PX0-4, x1:PX0+PEN_W, y0:GY0-PEN_EXT, y1:GY1+PEN_EXT }
+    : { x0:PX1-PEN_W, x1:PX1+4, y0:GY0-PEN_EXT, y1:GY1+PEN_EXT };
+}
+
 function newPlayer(id, name, team, bot){
   return { id:id, name:name, team:team, bot:bot,
            x:0, y:0, vx:0, vy:0,
-           stamina:STAM_MAX, lock:false, kcd:0, passReq:0, flash:0,
+           stamina:STAM_MAX, lock:false, kcd:0, passReq:0, flash:0, keeper:false,
            in:{u:0,d:0,l:0,r:0,s:0}, ev:[] };
 }
 
-function initGame(){
+function buildGameFromRoster(){
+  applyCfgLocal();
   G = { players:[], ball:{x:W/2,y:H/2,vx:0,vy:0,cw:null,ct:0}, score:[0,0],
         phase:'play', ptimer:0, msg:'', over:false, paused:false,
         koTeam:0, ko:true, t:0 };
-  // host kendi sectigi takimda (otomatik = kirmizi)
-  var hostTeam = myTeamPref==='1' ? 1 : 0;
-  G.players.push(newPlayer(myPid, myName, hostTeam, false));
-  fillBots();
+  LOBBY.roster.forEach(function(s){
+    if(s.team!==0 && s.team!==1) return;          // seyirci sahada degil
+    var p = newPlayer(s.id, s.name, s.team, !!s.bot);
+    p.keeper = (s.pos==='gk');
+    G.players.push(p);
+  });
   resetPositions();
 }
 
-function fillBots(){
-  var names0 = ['Bot Kaya','Bot Demir','Bot Aslan','Bot Yildiz'];
-  var names1 = ['Bot Celik','Bot Sahin','Bot Kurt','Bot Kartal'];
-  for(var t=0;t<2;t++){
-    var cnt = G.players.filter(function(p){return p.team===t;}).length;
-    var pool = t===0?names0:names1, ni=0;
-    while(cnt < teamSize){
-      var nm = pool[ni%pool.length]; ni++;
-      if(G.players.some(function(p){return p.name===nm;})) nm += '2';
-      G.players.push(newPlayer('bot'+t+'_'+Math.random().toString(36).slice(2,7), nm, t, true));
-      cnt++;
-    }
-  }
-}
-
-function trimBots(){
-  // her takımda teamSize'ı aşan botları çıkar
-  for(var t=0;t<2;t++){
-    var team = G.players.filter(function(p){return p.team===t;});
-    var extra = team.length - teamSize;
-    for(var i=G.players.length-1; i>=0 && extra>0; i--){
-      if(G.players[i].team===t && G.players[i].bot){ G.players.splice(i,1); extra--; }
-    }
-  }
+function applyCfgLocal(){
+  setField(LOBBY.cfg.field);
+  maxGoals = LOBBY.cfg.goals;
+  BOT_STYLE = LOBBY.cfg.style;
+  BOT_DIFF  = LOBBY.cfg.diff;
 }
 
 function resetPositions(){
@@ -315,6 +404,10 @@ function resetPositions(){
       var frac = (i+1)/(team.length+1);
       p.y = PY0 + frac*(PY1-PY0);
       p.x = t===0 ? PX0 + 130 + (i%2)*70 : PX1 - 130 - (i%2)*70;
+      if(p.keeper){
+        p.x = t===0 ? PX0+42 : PX1-42;
+        p.y = (GY0+GY1)/2;
+      }
       p.vx = 0; p.vy = 0;
     }
   }
@@ -373,6 +466,15 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     if(p.x > W-PR) { p.x = W-PR; p.vx = 0; }
     if(p.y < PR) { p.y = PR; p.vy = 0; }
     if(p.y > H-PR) { p.y = H-PR; p.vy = 0; }
+
+    // kaleci ceza sahasindan cikamaz (insan da olsa)
+    if(p.keeper){
+      var pb = penBox(p.team);
+      if(p.x < pb.x0){ p.x = pb.x0; p.vx = 0; }
+      if(p.x > pb.x1){ p.x = pb.x1; p.vx = 0; }
+      if(p.y < pb.y0){ p.y = pb.y0; p.vy = 0; }
+      if(p.y > pb.y1){ p.y = pb.y1; p.vy = 0; }
+    }
 
     // direge takilma: oyuncu diregin icinden gecemez
     var pposts = goalPosts();
@@ -564,20 +666,10 @@ function botThink(){
   for(var t=0;t<2;t++){
     var team = G.players.filter(function(p){return p.team===t;});
     var ownGX = t===0 ? PX0 : PX1, ownGY = (GY0+GY1)/2;
-    // kaleci: kendi kalesine en yakin bot (takimda birden fazla bot varsa)
-    var keeper=null;
-    var botCount = team.filter(function(p){return p.bot;}).length;
-    if(botCount > 1){
-      var kd=1e9;
-      for(var ki=0;ki<team.length;ki++){
-        var kp=team[ki];
-        if(!kp.bot) continue;
-        var d0=Math.abs(kp.x-ownGX)+Math.abs(kp.y-ownGY)*0.4;
-        if(d0<kd){ kd=d0; keeper=kp; }
-      }
-    }
-    // topa en yakın takım üyesi hücumcu (kaleci haric; top kaleye yakinsa kaleci mudahale eder)
-    var ballNearGoal = Math.abs(ball.x-ownGX) < 150 && ball.y > GY0-60 && ball.y < GY1+60;
+    // kaleci: mevkisi kaleci olan bot
+    var keeper = team.find(function(p){return p.keeper && p.bot;}) || null;
+    var kb = keeper ? penBox(t) : null;
+    var ballNearGoal = kb ? (ball.x > kb.x0-20 && ball.x < kb.x1+20 && ball.y > kb.y0-20 && ball.y < kb.y1+20) : false;
     var chaser=null, bd=1e9;
     for(var i=0;i<team.length;i++){
       if(team[i]===keeper && !ballNearGoal) continue;
@@ -616,7 +708,7 @@ function botThink(){
         var D = DIFFS[BOT_DIFF];
         if(req){
           kickToward(p, req.x, req.y, PASS_SPD); req.passReq=0;
-        } else if(Math.abs(p.x-gx) < D.shootRange){
+        } else if(Math.abs(p.x-gx) < D.shootRange + BOT_STYLE*40){
           kickToward(p, gx, gy + rnd(-GOAL_H*D.aimErr, GOAL_H*D.aimErr), SHOOT_SPD);
         } else if(Math.random()<0.012){
           var m = nearestMate(p);
@@ -631,8 +723,9 @@ function botThink(){
       } else {
         // dizil: topun konumuna göre kaydırılmış formasyon
         var frac=(slot+1)/(team.length+1);
-        var homeX = t===0 ? PX0+180 : PX1-180;
-        var tx = homeX + (ball.x - W/2)*0.35;
+        var off = STYLE_HOME[BOT_STYLE];
+        var homeX = t===0 ? PX0+off : PX1-off;
+        var tx = homeX + (ball.x - W/2)*STYLE_PUSH[BOT_STYLE];
         var ty = PY0 + frac*(PY1-PY0) + (ball.y - H/2)*0.25;
         moveBot(p, tx, ty, false);
       }
@@ -661,14 +754,16 @@ function kickToward(p, tx, ty, spd){
 }
 
 /* ================= AĞ ================= */
-function startHost(withCode){
+function startHost(withCode, attempt){
+  attempt = attempt || 0;
   var code = code5();
-  peer = new Peer('ballclub-' + code);
+  var opened = false;
+  try { if(peer) peer.destroy(); } catch(e){}
+  peer = new Peer('ballclub-' + code, PEER_OPTS);
   peer.on('open', function(){
-    roomCode = withCode ? code : null;
-    el('roomInfo').textContent = withCode ? ('Oda Kodu: ' + code) : 'Yerel oyun';
-    if(withCode) el('copyBtn').style.display = '';
-    startGameUI();
+    opened = true;
+    roomCode = code;
+    showLobby(); renderLobby();
   });
   peer.on('connection', function(conn){
     conn.on('open', function(){});
@@ -676,34 +771,61 @@ function startHost(withCode){
     conn.on('close', function(){ hostDrop(conn.peer); });
     conn.on('error', function(){ hostDrop(conn.peer); });
   });
+  peer.on('disconnected', function(){
+    // sinyal sunucusu koptu: oyun bozulmaz ama yeni katilim olmaz; sessizce tekrar baglan
+    if(opened){ try { peer.reconnect(); } catch(e){} }
+  });
   peer.on('error', function(err){
-    if(err.type==='unavailable-id'){ startHost(withCode); }
-    else menuMsg('Bağlantı hatası: ' + err.type);
+    if(err.type==='unavailable-id'){ startHost(withCode, attempt); return; }
+    if(err.type==='network'){
+      if(!opened && attempt < 3){
+        menuMsg('Sunucuya ulaşılamadı, tekrar deneniyor... (' + (attempt+1) + '/3)');
+        setTimeout(function(){ startHost(withCode, attempt+1); }, 1500);
+      } else if(!opened){
+        menuMsg('Bağlantı kurulamadı. İnterneti, güvenlik duvarını ve reklam engelleyiciyi kontrol edip tekrar dene. (VPN/okul-iş ağı PeerJS sunucusunu engelliyor olabilir)');
+      } else {
+        addChat('', 0, 'Sinyal sunucusu bağlantısı koptu, yeniden bağlanılıyor... (oyun devam eder, yeni oyuncu katılamaz)', true);
+        try { peer.reconnect(); } catch(e){}
+      }
+      return;
+    }
+    if(!opened) menuMsg('Bağlantı hatası: ' + err.type);
   });
 }
 
 function hostOnData(conn, msg){
   if(msg.t==='hi'){
     conns[conn.peer] = conn;
-    var h0 = G.players.filter(function(p){return p.team===0 && !p.bot;}).length;
-    var h1 = G.players.filter(function(p){return p.team===1 && !p.bot;}).length;
-    var hasBot = function(t){ return G.players.some(function(p){return p.team===t && p.bot;}); };
-    var want = msg.tm==='0' ? 0 : (msg.tm==='1' ? 1 : null);
-    var team;
-    if(want!==null && hasBot(want)) team = want;               // istedigi takimda bot yeri var
-    else if(want!==null && hasBot(1-want)) team = 1-want;      // istedigi dolu, diger takima
-    else team = h1 < h0 ? 1 : 0;                               // otomatik: az insanli takima
-    var bot = G.players.find(function(p){return p.team===team && p.bot;});
-    var np;
-    if(bot){ bot.bot=false; bot.id=conn.peer; bot.name=msg.n||'Misafir'; bot.stamina=STAM_MAX; np=bot; }
-    else {
-      np = newPlayer(conn.peer, msg.n||'Misafir', team, false);
-      G.players.push(np);
+    var nm = (msg.n||'Misafir').slice(0,14);
+    conn.send({t:'wel', pid:conn.peer});
+    if(LOBBY.started){
+      // mac sirasinda katilan: bir bota gecir, yoksa seyirci
+      var slot = LOBBY.roster.find(function(s){return s.bot && (s.team===0||s.team===1);});
+      if(slot){ slot.bot=false; slot.id=conn.peer; slot.name=nm;
+        var pp=G.players.find(function(q){return q.id===slot.id;});
+        // oyuncu id bot idsiydi; guncelle
+      }
+      // basitlik: mac ortasinda katilan seyirci kalir, bir sonraki maca dahil
+      LOBBY.roster.push({ id:conn.peer, name:nm, team:2, pos:'fld', bot:false });
+      conn.send({t:'start', fs:fieldSize, mg:maxGoals});
+      pushLobby();
+    } else {
+      LOBBY.roster.push({ id:conn.peer, name:nm, team:2, pos:'fld', bot:false });
+      pushLobby(); renderLobby();
+      lchat('', 0, nm + ' odaya katıldı', true);
+      lchatBroadcast('', 0, nm + ' odaya katıldı', true);
     }
-    np.in={u:0,d:0,l:0,r:0,s:0};
-    conn.send({t:'wel', pid:conn.peer, fs:fieldSize});
-    addChat('', 0, np.name + ' oyuna katıldı (' + (np.team===0?'Kırmızı':'Mavi') + ')', true);
-    chatBroadcast('', 0, np.name + ' oyuna katıldı (' + (np.team===0?'Kırmızı':'Mavi') + ')', true);
+  } else if(msg.t==='lreq'){
+    var s = LOBBY.roster.find(function(x){return x.id===conn.peer;});
+    if(s){
+      if(msg.a==='team' && (msg.team===0||msg.team===1||msg.team===2)) s.team=msg.team;
+      else if(msg.a==='pos' && (msg.pos==='gk'||msg.pos==='fld')) s.pos=msg.pos;
+      pushLobby(); renderLobby();
+    }
+  } else if(msg.t==='lchat'){
+    var cs = LOBBY.roster.find(function(x){return x.id===conn.peer;});
+    if(cs && typeof msg.x==='string'){ var tx=msg.x.trim().slice(0,120);
+      if(tx){ lchat(cs.name, cs.team, tx, false); lchatBroadcast(cs.name, cs.team, tx, false); } }
   } else if(msg.t==='in'){
     var p = G.players.find(function(q){return q.id===conn.peer;});
     if(p) p.in = msg.k;
@@ -711,7 +833,8 @@ function hostOnData(conn, msg){
     if(msg.pw===SET_PW){
       if(typeof msg.sp==='number') SPD_P = Math.min(2, Math.max(0.5, msg.sp));
       if(typeof msg.sb==='number') SPD_B = Math.min(2, Math.max(0.5, msg.sb));
-      if(typeof msg.bd==='number') BOT_DIFF = Math.min(2, Math.max(0, Math.round(msg.bd)));
+      if(typeof msg.bd==='number'){ BOT_DIFF = Math.min(2, Math.max(0, Math.round(msg.bd))); LOBBY.cfg.diff=BOT_DIFF; }
+      if(typeof msg.stl==='number'){ BOT_STYLE = Math.min(2, Math.max(0, Math.round(msg.stl))); LOBBY.cfg.style=BOT_STYLE; }
       if(msg.tp) G.paused = !G.paused;
     }
   } else if(msg.t==='chat'){
@@ -731,10 +854,21 @@ function hostOnData(conn, msg){
 
 function hostDrop(pid){
   delete conns[pid];
+  var s = LOBBY.roster.find(function(x){return x.id===pid;});
+  var nm = s ? s.name : '';
+  if(!LOBBY.started){
+    // lobide: rosterdan sil
+    LOBBY.roster = LOBBY.roster.filter(function(x){return x.id!==pid;});
+    pushLobby(); renderLobby();
+    lchat('', 0, nm + ' odadan ayrıldı', true);
+    lchatBroadcast('', 0, nm + ' odadan ayrıldı', true);
+    return;
+  }
   var p = G.players.find(function(q){return q.id===pid;});
   if(p){
     var oldName = p.name;
     p.bot=true; p.name='Bot ('+p.name+')'; p.in={u:0,d:0,l:0,r:0,s:0};
+    if(s){ s.bot=true; }
     addChat('', 0, oldName + ' oyundan ayrıldı', true);
     chatBroadcast('', 0, oldName + ' oyundan ayrıldı', true);
   }
@@ -744,28 +878,35 @@ function broadcast(){
   var st = { t:'st',
     p: G.players.map(function(p){ return { i:p.id, n:p.name, t:p.team, b:p.bot?1:0,
         x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0,
-        fl:(p.flash>0 || p.glow)?1:0 }; }),
+        fl:(p.flash>0 || p.glow)?1:0, kp:(p.keeper&&p.bot)?1:0 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
-    s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF],
+    s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF,BOT_STYLE],
     ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam };
   for(var k in conns){ try{ conns[k].send(st); }catch(e){} }
 }
 
-function startClient(code){
-  peer = new Peer();
+function startClient(code, attempt){
+  attempt = attempt || 0;
+  var copened = false;
+  try { if(peer) peer.destroy(); } catch(e){}
+  peer = new Peer(PEER_OPTS);
   peer.on('open', function(){
+    copened = true;
     hostConn = peer.connect('ballclub-' + code.toUpperCase(), {reliable:true});
     var ok=false;
     hostConn.on('open', function(){
-      hostConn.send({t:'hi', n:myName, tm:myTeamPref});
+      hostConn.send({t:'hi', n:myName});
     });
     hostConn.on('data', function(msg){
-      if(msg.t==='wel'){ ok=true; myPid=msg.pid; roomCode=code.toUpperCase(); setField(msg.fs); startGameUI();
+      if(msg.t==='wel'){ ok=true; myPid=msg.pid; roomCode=code.toUpperCase(); showLobby(); }
+      else if(msg.t==='lob'){ LOBBY.roster=msg.r; LOBBY.cfg=msg.c; roomCode=msg.code||roomCode; renderLobby(); }
+      else if(msg.t==='lchatb'){ lchat(msg.n, msg.tm, msg.x, !!msg.sy); }
+      else if(msg.t==='start'){ if(msg.fs) setField(msg.fs); if(msg.mg) maxGoals=msg.mg; LOBBY.started=true; startGameUI();
         el('roomInfo').textContent='Odaya bağlı: '+roomCode; el('copyBtn').style.display=''; }
       else if(msg.t==='chatb'){ addChat(msg.n, msg.tm, msg.x, !!msg.sy); }
       else if(msg.t==='st'){
         G = msg;
-        if(msg.cf){ SPD_P=msg.cf[0]; SPD_B=msg.cf[1]; if(msg.cf.length>2) BOT_DIFF=msg.cf[2]; }
+        if(msg.cf){ SPD_P=msg.cf[0]; SPD_B=msg.cf[1]; if(msg.cf.length>2) BOT_DIFF=msg.cf[2]; if(msg.cf.length>3) BOT_STYLE=msg.cf[3]; }
         if(!Gr) Gr = JSON.parse(JSON.stringify(msg));
       }
     });
@@ -773,15 +914,31 @@ function startClient(code){
     hostConn.on('error', function(){ menuMsg('Odaya bağlanılamadı.'); });
     setTimeout(function(){ if(!ok && !running) menuMsg('Oda bulunamadı. Kodu kontrol et.'); }, 6000);
   });
-  peer.on('error', function(err){ menuMsg('Bağlantı hatası: ' + err.type); });
+  peer.on('disconnected', function(){
+    if(copened && !running){ try { peer.reconnect(); } catch(e){} }
+  });
+  peer.on('error', function(err){
+    if(err.type==='peer-unavailable'){ menuMsg('Oda bulunamadı. Kodu kontrol et.'); return; }
+    if(err.type==='network'){
+      if(!copened && attempt < 3){
+        menuMsg('Sunucuya ulaşılamadı, tekrar deneniyor... (' + (attempt+1) + '/3)');
+        setTimeout(function(){ startClient(code, attempt+1); }, 1500);
+      } else if(!copened){
+        menuMsg('Bağlantı kurulamadı. İnterneti, güvenlik duvarını ve reklam engelleyiciyi kontrol edip tekrar dene.');
+      }
+      return;
+    }
+    menuMsg('Bağlantı hatası: ' + err.type);
+  });
 }
 
 /* ================= DÖNGÜ ================= */
 function startGameUI(){
   el('menu').style.display='none';
+  el('lobby').style.display='none';
   el('gameWrap').style.display='flex';
-  running = true; lastT = performance.now();
-  requestAnimationFrame(loop);
+  setTimeout(fitScale, 30);
+  if(!running){ running = true; lastT = performance.now(); requestAnimationFrame(loop); }
 }
 
 function loop(now){
@@ -806,7 +963,7 @@ function loop(now){
         for(var j=0;j<Gr.p.length;j++) if(Gr.p[j].i===tp.i){ rp=Gr.p[j]; break; }
         if(!rp){ Gr.p.push(JSON.parse(JSON.stringify(tp))); continue; }
         rp.x += (tp.x-rp.x)*t; rp.y += (tp.y-rp.y)*t;
-        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fl=tp.fl;
+        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fl=tp.fl; rp.kp=tp.kp;
       }
       Gr.p = Gr.p.filter(function(rp){ return G.p.some(function(tp){return tp.i===rp.i;}); });
       Gr.b[0] += (G.b[0]-Gr.b[0])*t; Gr.b[1] += (G.b[1]-Gr.b[1])*t;
@@ -818,7 +975,7 @@ function loop(now){
 }
 
 function hostView(){
-  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0};}),
+  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0,kp:(p.keeper&&p.bot)?1:0};}),
            b:[G.ball.x,G.ball.y], s:G.score, ph:G.phase, m:G.msg, pa:G.paused?1:0,
            ko:(G.ko && G.phase==='play')?1:0, kt:G.koTeam };
 }
@@ -838,6 +995,10 @@ function render(v){
   ctx.beginPath(); ctx.arc(W/2,H/2,70,0,Math.PI*2); ctx.stroke();
   ctx.fillStyle='#C7D6B5';
   ctx.beginPath(); ctx.arc(W/2,H/2,4,0,Math.PI*2); ctx.fill();
+  // ceza sahalari
+  ctx.strokeStyle='#C7D6B5'; ctx.lineWidth=2;
+  ctx.strokeRect(PX0, GY0-PEN_EXT, PEN_W, GOAL_H+2*PEN_EXT);
+  ctx.strokeRect(PX1-PEN_W, GY0-PEN_EXT, PEN_W, GOAL_H+2*PEN_EXT);
   // kaleler
   drawGoal(PX0, -1); drawGoal(PX1, 1);
   // top gölgesi + top
@@ -851,6 +1012,10 @@ function render(v){
     var p=v.p[i];
     var me = (p.i===myPid);
     var flash = !!p.fl; // vurusta veya X/Space/Shift basiliyken yanar
+    if(me){
+      ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(p.x,p.y,PR+5,0,Math.PI*2); ctx.stroke();
+    }
     ctx.fillStyle = p.t===0 ? '#E56E56' : '#5689E5';
     ctx.strokeStyle = flash ? '#FFFFFF' : '#1B2125';
     ctx.lineWidth = flash ? 3.5 : 2;
@@ -858,7 +1023,7 @@ function render(v){
     ctx.fillStyle = me ? '#FFFFFF' : 'rgba(255,255,255,0.85)';
     ctx.font = (me?'bold ':'')+'11px Segoe UI, Arial';
     ctx.textAlign='center';
-    ctx.fillText((p.b?'[B] ':'')+p.n, p.x, p.y+PR+14);
+    ctx.fillText((p.kp?'[K] ':(p.b?'[B] ':''))+p.n, p.x, p.y+PR+14);
   }
   // baslama vurusu bildirimi
   if(v.ko && !v.pa && !v.m){
@@ -910,6 +1075,145 @@ function drawGoal(x, dir){
   ctx.beginPath(); ctx.arc(x,GY0,POST_R,0,Math.PI*2); ctx.fill(); ctx.stroke();
   ctx.beginPath(); ctx.arc(x,GY1,POST_R,0,Math.PI*2); ctx.fill(); ctx.stroke();
 }
+
+/* ================= LOBİ ================= */
+function showMenu(){ el('menu').style.display='block'; el('lobby').style.display='none'; el('gameWrap').style.display='none'; }
+function showLobby(){ el('menu').style.display='none'; el('lobby').style.display='block'; el('gameWrap').style.display='none';
+  var ho = document.querySelectorAll('.hostOnly');
+  for(var i=0;i<ho.length;i++) ho[i].classList.toggle('hidden', role!=='host');
+  el('lobCode').innerHTML = roomCode ? ('Oda kodu: <b id="lobCodeVal">'+roomCode+'</b> <button class="miniBtn" id="lobCopyBtn" style="padding:3px 10px">Kopyala</button>') : 'Yerel oyun';
+  var lc = el('lobCopyBtn'); if(lc) lc.onclick = function(){ copyText(roomCode, lc); };
+  syncLobCfg();
+}
+
+function mySlot(){ return LOBBY.roster.find(function(s){return s.id===myPid;}); }
+
+function renderLobby(){
+  var cols = { 0:el('colRed'), 1:el('colBlue'), 2:el('colSpec') };
+  cols[0].innerHTML=''; cols[1].innerHTML=''; cols[2].innerHTML='';
+  LOBBY.roster.forEach(function(s){
+    var row = document.createElement('div');
+    row.className = 'lobSlot' + (s.id===myPid?' me':'');
+    var nm = document.createElement('span'); nm.className='nm'; nm.textContent = (s.bot?'🤖 ':'')+s.name;
+    row.appendChild(nm);
+    if((s.team===0||s.team===1) && s.pos==='gk'){
+      var tg=document.createElement('span'); tg.className='tag gk'; tg.textContent='KALECİ'; row.appendChild(tg);
+    } else if(s.bot){
+      var tb=document.createElement('span'); tb.className='tag'; tb.textContent='BOT'; row.appendChild(tb);
+    }
+    if(role==='host' && s.bot){
+      var xb=document.createElement('button'); xb.className='xb'; xb.textContent='×';
+      xb.onclick=function(){ removeBot(s.id); };
+      row.appendChild(xb);
+    }
+    (cols[s.team]||cols[2]).appendChild(row);
+  });
+  // mevki secici benim slotuma gore
+  var ms = mySlot();
+  el('posSel').value = (ms && ms.pos) ? ms.pos : 'fld';
+  el('posSel').disabled = !ms || ms.team===2;
+  // baslat butonu: en az 1 kirmizi ve 1 mavi
+  var st = el('lobStart');
+  if(st){
+    var r0 = LOBBY.roster.some(function(s){return s.team===0;});
+    var r1 = LOBBY.roster.some(function(s){return s.team===1;});
+    st.disabled = !(r0 && r1);
+    el('lobMsg').textContent = (r0&&r1) ? '' : 'Başlatmak için her iki takımda da en az bir oyuncu/bot olmalı.';
+  }
+}
+
+function syncLobCfg(){
+  el('lfieldSel').value = LOBBY.cfg.field;
+  el('lstyleSel').value = ''+LOBBY.cfg.style;
+  el('ldiffSel').value = ''+LOBBY.cfg.diff;
+  el('lgoalSel').value = ''+LOBBY.cfg.goals;
+}
+
+function pushLobby(){
+  if(role!=='host') return;
+  var msg = { t:'lob', r:LOBBY.roster, c:LOBBY.cfg, code:roomCode };
+  for(var k in conns){ try{ conns[k].send(msg); }catch(e){} }
+}
+
+// host mutasyonlari
+function setMyTeam(team){
+  if(role==='host'){ var s=mySlot(); if(s){ s.team=team; } pushLobby(); renderLobby(); }
+  else if(hostConn && hostConn.open){ hostConn.send({t:'lreq', a:'team', team:team}); }
+}
+function setMyPos(pos){
+  if(role==='host'){ var s=mySlot(); if(s){ s.pos=pos; } pushLobby(); renderLobby(); }
+  else if(hostConn && hostConn.open){ hostConn.send({t:'lreq', a:'pos', pos:pos}); }
+}
+var botCounter = 0;
+var BOT_NAMES = ['Kaya','Demir','Aslan','Yildiz','Celik','Sahin','Kurt','Kartal','Toprak','Deniz'];
+function addBot(team){
+  if(role!=='host') return;
+  var nm = 'Bot '+BOT_NAMES[botCounter % BOT_NAMES.length]; botCounter++;
+  if(LOBBY.roster.some(function(s){return s.name===nm;})) nm += botCounter;
+  LOBBY.roster.push({ id:'bot_'+Math.random().toString(36).slice(2,8), name:nm, team:team, pos:'fld', bot:true });
+  pushLobby(); renderLobby();
+}
+function removeBot(id){
+  if(role!=='host') return;
+  LOBBY.roster = LOBBY.roster.filter(function(s){return s.id!==id;});
+  pushLobby(); renderLobby();
+}
+function setCfg(key, val){
+  if(role!=='host') return;
+  LOBBY.cfg[key]=val; pushLobby();
+}
+
+function startMatch(){
+  if(role!=='host') return;
+  var r0 = LOBBY.roster.some(function(s){return s.team===0;});
+  var r1 = LOBBY.roster.some(function(s){return s.team===1;});
+  if(!(r0&&r1)) return;
+  LOBBY.started = true;
+  buildGameFromRoster();
+  for(var k in conns){ try{ conns[k].send({t:'start', fs:fieldSize, mg:maxGoals}); }catch(e){} }
+  startGameUI();
+}
+
+// lobi sohbeti (oyun sohbetiyle ayni fonksiyona benzer)
+function lchat(name, team, text, sys){
+  var log = el('lchatLog'); if(!log) return;
+  var line = document.createElement('div');
+  if(sys){ line.className='sys'; line.textContent=text; }
+  else { var s=document.createElement('span'); s.className='cn t'+team; s.textContent=name+': '; line.appendChild(s); line.appendChild(document.createTextNode(text)); }
+  log.appendChild(line); while(log.childNodes.length>50) log.removeChild(log.firstChild); log.scrollTop=log.scrollHeight;
+}
+function lchatBroadcast(name, team, text, sys){
+  var m={t:'lchatb', n:name, tm:team, x:text, sy:sys?1:0};
+  for(var k in conns){ try{ conns[k].send(m); }catch(e){} }
+}
+function sendLchat(){
+  var inp=el('lchatInp'); var text=inp.value.trim().slice(0,120); inp.value='';
+  if(!text) return;
+  if(role==='host'){ var s=mySlot(); var tm=s?s.team:2; lchat(myName, tm, text, false); lchatBroadcast(myName, tm, text, false); }
+  else if(hostConn && hostConn.open){ hostConn.send({t:'lchat', x:text}); }
+}
+
+function copyText(txt, btn){
+  if(!txt) return;
+  function done(){ var o=btn.textContent; btn.textContent='Kopyalandı!'; setTimeout(function(){ btn.textContent=o; },1500); }
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done, function(){ fb(); done(); }); }
+  else { fb(); done(); }
+  function fb(){ var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(e){} document.body.removeChild(ta); }
+}
+
+/* ================= EKRAN ÖLÇEKLEME ================= */
+function fitScale(){
+  var sc = el('gameScale'); if(!sc || el('gameWrap').style.display==='none') return;
+  sc.style.transform = 'scale(1)';
+  var w = sc.offsetWidth, hh = sc.offsetHeight;
+  if(!w || !hh) return;
+  var vw = window.innerWidth - 24, vh = window.innerHeight - 24;
+  var k = Math.min(vw/w, vh/hh);
+  k = Math.max(0.5, Math.min(k, 2.2));
+  sc.style.transform = 'scale(' + k + ')';
+}
+window.addEventListener('resize', fitScale);
+document.addEventListener('fullscreenchange', function(){ setTimeout(fitScale, 60); });
 
 /* ================= SOHBET ================= */
 function addChat(name, team, text, sys){
@@ -1072,28 +1376,25 @@ function sendEvent(a){
 function menuMsg(s){ el('menuMsg').textContent = s; }
 function readMenu(){
   myName = el('nameInp').value.trim() || 'Oyuncu';
-  teamSize = parseInt(el('sizeSel').value, 10);
-  maxGoals = parseInt(el('goalSel').value, 10);
-  myTeamPref = el('teamSel').value;
-  if(role!=='client'){
-    setField(el('fieldSel').value);
-    SPD_P = parseInt(el('pspdInp').value, 10) / 100;
-    SPD_B = parseInt(el('bspdInp').value, 10) / 100;
-    BOT_DIFF = parseInt(el('diffSel').value, 10);
-  }
+}
+
+function initLobbyHost(){
+  LOBBY.roster = [{ id:'host', name:myName, team:0, pos:'fld', bot:false }];
+  LOBBY.cfg = { field:'big', goals:5, style:1, diff:1 };
+  LOBBY.started = false;
+  applyCfgLocal();
 }
 
 el('soloBtn').onclick = function(){
-  readMenu(); role='host'; myPid='host';
-  initGame();
-  el('roomInfo').textContent='Yerel oyun (botlara karşı)';
-  startGameUI();
+  readMenu(); role='host'; myPid='host'; roomCode=null;
+  initLobbyHost();
+  showLobby(); renderLobby();
 };
 
 el('hostBtn').onclick = function(){
   readMenu(); role='host'; myPid='host';
+  initLobbyHost();
   menuMsg('Oda kuruluyor...');
-  initGame();
   startHost(true);
 };
 
@@ -1110,6 +1411,21 @@ el('joinGoBtn').onclick = function(){
   menuMsg('Bağlanılıyor...');
   startClient(code);
 };
+
+// lobi butonlari
+el('joinRedBtn').onclick = function(){ setMyTeam(0); };
+el('joinBlueBtn').onclick = function(){ setMyTeam(1); };
+el('joinSpecBtn').onclick = function(){ setMyTeam(2); };
+el('addRedBtn').onclick = function(){ addBot(0); };
+el('addBlueBtn').onclick = function(){ addBot(1); };
+el('posSel').onchange = function(){ setMyPos(this.value); };
+el('lfieldSel').onchange = function(){ setCfg('field', this.value); };
+el('lstyleSel').onchange = function(){ setCfg('style', parseInt(this.value,10)); };
+el('ldiffSel').onchange = function(){ setCfg('diff', parseInt(this.value,10)); };
+el('lgoalSel').onchange = function(){ setCfg('goals', parseInt(this.value,10)); };
+el('lobStart').onclick = startMatch;
+el('lchatSend').onclick = sendLchat;
+el('lchatInp').addEventListener('keydown', function(e){ if(e.key==='Enter'){ sendLchat(); } e.stopPropagation(); });
 
 el('copyBtn').onclick = function(){
   if(!roomCode) return;
@@ -1160,6 +1476,7 @@ function syncPanel(){
   el('gpVal').textContent = Math.round(SPD_P*100)+'%';
   el('gbVal').textContent = Math.round(SPD_B*100)+'%';
   el('gdSel').value = ''+BOT_DIFF;
+  el('gstSel').value = ''+BOT_STYLE;
 }
 
 el('pwBtn').onclick = function(){
@@ -1180,12 +1497,14 @@ function applyLive(){
   el('gpVal').textContent = Math.round(sp*100)+'%';
   el('gbVal').textContent = Math.round(sb*100)+'%';
   var bd = parseInt(el('gdSel').value,10);
-  if(role==='host'){ SPD_P=sp; SPD_B=sb; BOT_DIFF=bd; }
-  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, bd:bd}); }
+  var stl = parseInt(el('gstSel').value,10);
+  if(role==='host'){ SPD_P=sp; SPD_B=sb; BOT_DIFF=bd; BOT_STYLE=stl; LOBBY.cfg.diff=bd; LOBBY.cfg.style=stl; }
+  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, bd:bd, stl:stl}); }
 }
 el('gpInp').oninput = applyLive;
 el('gbInp').oninput = applyLive;
 el('gdSel').onchange = applyLive;
+el('gstSel').onchange = applyLive;
 
 el('pauseBtn2').onclick = function(){
   if(role==='host'){ G.paused = !G.paused; }
@@ -1194,6 +1513,12 @@ el('pauseBtn2').onclick = function(){
 
 el('pspdInp').oninput = function(){ el('pspdVal').textContent = this.value + '%'; };
 el('bspdInp').oninput = function(){ el('bspdVal').textContent = this.value + '%'; };
+
+el('fsBtn').onclick = function(){
+  var w = el('gameWrap');
+  if(!document.fullscreenElement){ if(w.requestFullscreen) w.requestFullscreen(); }
+  else { if(document.exitFullscreen) document.exitFullscreen(); }
+};
 
 el('leaveBtn').onclick = function(){ location.reload(); };
 </script>
