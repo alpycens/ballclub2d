@@ -213,6 +213,7 @@
         <input type="range" id="lbspdInp" min="50" max="200" step="10" value="100" style="width:120px">
       </div>
       <button class="hostOnly" id="lobStart">Maçı Başlat</button>
+      <button class="hostOnly" id="endMatchBtn" style="display:none;padding:10px 20px;font-size:14px;font-weight:700;background:#7A3C3C">Maçı Bitir</button>
       <button id="backToGameBtn" style="display:none;padding:10px 26px;font-size:15px;font-weight:700;background:#4C5E68">Oyuna Dön</button>
     </div>
     <div id="lobMsg"></div>
@@ -994,6 +995,7 @@ function startClient(code, attempt){
       else if(msg.t==='lchatb'){ lchat(msg.n, msg.tm, msg.x, !!msg.sy); }
       else if(msg.t==='start'){ if(msg.fs) setField(msg.fs); if(msg.mg) maxGoals=msg.mg; LOBBY.started=true; startGameUI();
         el('roomInfo').textContent='Odaya bağlı: '+roomCode; el('copyBtn').style.display=''; }
+      else if(msg.t==='ended'){ LOBBY.started=false; running=false; el('gameWrap').style.display='none'; showLobby(); renderLobby(); }
       else if(msg.t==='chatb'){ addChat(msg.n, msg.tm, msg.x, !!msg.sy); }
       else if(msg.t==='st'){
         G = msg;
@@ -1255,9 +1257,11 @@ function renderLobby(){
     wrap.appendChild(lab); wrap.appendChild(sel);
     col.appendChild(wrap);
   });
-  // oyun sirasinda: oyuna don butonu + saha/gol kilidi
+  // oyun sirasinda: oyuna don + maci bitir; ayarlar mac basladiysa kilitli
   var od = el('backToGameBtn');
-  if(od) od.style.display = (LOBBY.started && role!=='spectatorNever') ? 'inline-block' : 'none';
+  if(od) od.style.display = LOBBY.started ? 'inline-block' : 'none';
+  var em = el('endMatchBtn');
+  if(em) em.style.display = (LOBBY.started && role==='host') ? 'inline-block' : 'none';
   el('lfieldSel').disabled = LOBBY.started;
   el('lgoalSel').disabled = LOBBY.started;
   el('lminSel').disabled = LOBBY.started;
@@ -1341,6 +1345,16 @@ function startMatch(){
   buildGameFromRoster();
   for(var k in conns){ try{ conns[k].send({t:'start', fs:fieldSize, mg:maxGoals}); }catch(e){} }
   startGameUI();
+}
+
+// maci bitir: lobiye don, ayarlar tekrar acilir (saha, sure, gol vs)
+function endMatch(){
+  if(role!=='host') return;
+  LOBBY.started = false;
+  running = false;
+  for(var k in conns){ try{ conns[k].send({t:'ended'}); }catch(e){} }
+  el('gameWrap').style.display='none';
+  showLobby(); renderLobby();
 }
 
 // lobi sohbeti (oyun sohbetiyle ayni fonksiyona benzer)
@@ -1706,6 +1720,8 @@ el('backToGameBtn').onclick = function(){
   el('gameWrap').style.display='flex';
   setTimeout(fitScale, 30);
 };
+
+el('endMatchBtn').onclick = endMatch;
 
 el('leaveBtn').onclick = function(){ location.reload(); };
 </script>
