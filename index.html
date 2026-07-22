@@ -207,6 +207,12 @@
       <div class="cfgItem hostOnly"><label>Süre</label>
         <select id="lminSel"><option value="0" selected>Süresiz</option><option value="1">1 dk</option><option value="2">2 dk</option><option value="3">3 dk</option><option value="5">5 dk</option></select>
       </div>
+      <div class="cfgItem hostOnly"><label>Oyuncu hızı: <span id="lpspdVal">100%</span></label>
+        <input type="range" id="lpspdInp" min="50" max="200" step="10" value="100" style="width:120px">
+      </div>
+      <div class="cfgItem hostOnly"><label>Top hızı: <span id="lbspdVal">100%</span></label>
+        <input type="range" id="lbspdInp" min="50" max="200" step="10" value="100" style="width:120px">
+      </div>
       <button class="hostOnly" id="lobStart">Maçı Başlat</button>
       <button id="backToGameBtn" style="display:none;padding:10px 26px;font-size:15px;font-weight:700;background:#4C5E68">Oyuna Dön</button>
     </div>
@@ -305,7 +311,7 @@ var ROLE_X = { def:0.18, mid:0.42, fwd:0.66 };      // mevkinin kendi kaleye gor
 var ROLE_TR = { gk:'Kaleci', def:'Defans', mid:'Orta Saha', fwd:'Forvet' };
 var matchMins = 0;                                  // 0 = suresiz
 var PEN_W = 114, PEN_EXT = 45;                      // ceza sahasi: derinlik ve kale ustu/alti tasma
-var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:1, mins:0 }, started:false };
+var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:1, mins:0, spdP:1, spdB:1 }, started:false };
 var DIFFS = [
   { spd:0.75, aimErr:0.55, shootRange:230, sprint:false, kcd:650, keepErr:34 },  // kolay
   { spd:1.0,  aimErr:0.32, shootRange:320, sprint:true,  kcd:350, keepErr:12 },  // normal
@@ -396,6 +402,8 @@ function applyCfgLocal(){
   BOT_STYLE = [LOBBY.cfg.style0, LOBBY.cfg.style1];
   BOT_DIFF  = LOBBY.cfg.diff;
   matchMins = LOBBY.cfg.mins || 0;
+  SPD_P = LOBBY.cfg.spdP || 1;
+  SPD_B = LOBBY.cfg.spdB || 1;
 }
 
 function resetPositions(){
@@ -1237,6 +1245,9 @@ function syncLobCfg(){
   el('ldiffSel').value = ''+LOBBY.cfg.diff;
   el('lgoalSel').value = ''+LOBBY.cfg.goals;
   el('lminSel').value = ''+(LOBBY.cfg.mins||0);
+  var sp=Math.round((LOBBY.cfg.spdP||1)*100), sb=Math.round((LOBBY.cfg.spdB||1)*100);
+  el('lpspdInp').value=sp; el('lpspdVal').textContent=sp+'%';
+  el('lbspdInp').value=sb; el('lbspdVal').textContent=sb+'%';
 }
 
 function pushLobby(){
@@ -1508,7 +1519,7 @@ function readMenu(){
 
 function initLobbyHost(){
   LOBBY.roster = [{ id:'host', name:myName, team:0, pos:'mid', bot:false }];
-  LOBBY.cfg = { field:'big', goals:3, style0:1, style1:1, diff:1, mins:0 };
+  LOBBY.cfg = { field:'big', goals:3, style0:1, style1:1, diff:1, mins:0, spdP:1, spdB:1 };
   LOBBY.started = false;
   applyCfgLocal();
 }
@@ -1551,6 +1562,8 @@ el('lfieldSel').onchange = function(){ setCfg('field', this.value); };
 el('ldiffSel').onchange = function(){ setCfg('diff', parseInt(this.value,10)); };
 el('lgoalSel').onchange = function(){ setCfg('goals', parseInt(this.value,10)); };
 el('lminSel').onchange = function(){ setCfg('mins', parseInt(this.value,10)); };
+el('lpspdInp').oninput = function(){ var v=parseInt(this.value,10); el('lpspdVal').textContent=v+'%'; if(role==='host'){ SPD_P=v/100; setCfg('spdP', v/100); } };
+el('lbspdInp').oninput = function(){ var v=parseInt(this.value,10); el('lbspdVal').textContent=v+'%'; if(role==='host'){ SPD_B=v/100; setCfg('spdB', v/100); } };
 el('lobStart').onclick = startMatch;
 el('lchatSend').onclick = sendLchat;
 el('lchatInp').addEventListener('keydown', function(e){ if(e.key==='Enter'){ sendLchat(); } e.stopPropagation(); });
