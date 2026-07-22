@@ -112,6 +112,12 @@
     <option value="big" selected>Big</option>
     <option value="huge">Huge</option>
   </select>
+  <label>Bot zorluğu</label>
+  <select id="diffSel">
+    <option value="0">Kolay</option>
+    <option value="1" selected>Normal</option>
+    <option value="2">Zor</option>
+  </select>
   <label>Maç kaç golde biter</label>
   <select id="goalSel">
     <option value="3">3 gol</option>
@@ -170,6 +176,12 @@
       <input type="range" id="gpInp" min="50" max="200" step="10" value="100">
       <label>Top hızı: <span id="gbVal">100%</span></label>
       <input type="range" id="gbInp" min="50" max="200" step="10" value="100">
+      <label>Bot zorluğu</label>
+      <select id="gdSel" style="width:100%;padding:7px 9px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:13px">
+        <option value="0">Kolay</option>
+        <option value="1">Normal</option>
+        <option value="2">Zor</option>
+      </select>
       <button id="pauseBtn2">Maçı Durdur</button>
     </div>
   </div>
@@ -203,6 +215,12 @@ var BDAMP = 0.992, BOUNCE = 0.82;
 var SHOOT_SPD = 9.5, PASS_SPD = 6.8;
 var STAM_MAX = 100, STAM_DRAIN = 38, STAM_REGEN = 17, STAM_UNLOCK = 25;
 var SPD_P = 1, SPD_B = 1;                           // ayarlar: oyuncu / top hizi carpani
+var BOT_DIFF = 1;                                   // 0 kolay, 1 normal, 2 zor
+var DIFFS = [
+  { spd:0.75, aimErr:0.55, shootRange:230, sprint:false, kcd:650, keepErr:34 },  // kolay
+  { spd:1.0,  aimErr:0.32, shootRange:320, sprint:true,  kcd:350, keepErr:12 },  // normal
+  { spd:1.2,  aimErr:0.14, shootRange:410, sprint:true,  kcd:240, keepErr:0  }   // zor
+];
 var TICK_MS = 1000/60, NET_MS = 1000/30;
 
 /* ================= DURUM ================= */
@@ -252,7 +270,7 @@ function newPlayer(id, name, team, bot){
 function initGame(){
   G = { players:[], ball:{x:W/2,y:H/2,vx:0,vy:0,cw:null,ct:0}, score:[0,0],
         phase:'play', ptimer:0, msg:'', over:false, paused:false,
-        koTeam:0, ko:true };
+        koTeam:0, ko:true, t:0 };
   // host kendi sectigi takimda (otomatik = kirmizi)
   var hostTeam = myTeamPref==='1' ? 1 : 0;
   G.players.push(newPlayer(myPid, myName, hostTeam, false));
@@ -314,6 +332,7 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     // duraklamada da hafif top sürtünmesi olsun
   }
   var play = (G.phase==='play');
+  G.t += dt;
 
   // botların girişlerini hesapla
   if(play) botThink();
@@ -341,6 +360,7 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
       if(p.lock && p.stamina>=STAM_UNLOCK) p.lock=false;
     }
     var maxv = (sprinting ? SPRINT_MAX : BASE_MAX) * SPD_P;
+    if(p.bot) maxv *= DIFFS[BOT_DIFF].spd;
 
     p.vx += mx*ACC*SPD_P*dt; p.vy += my*ACC*SPD_P*dt;
     p.vx *= Math.pow(PDAMP, dt); p.vy *= Math.pow(PDAMP, dt);
@@ -574,7 +594,8 @@ function botThink(){
       if(p===keeper && p!==chaser && !hasBall){
         // kale cizgisinde topu takip et
         var kx = t===0 ? PX0+42 : PX1-42;
-        var kyy = Math.max(GY0+14, Math.min(GY1-14, ball.y));
+        var kerr = DIFFS[BOT_DIFF].keepErr;
+        var kyy = Math.max(GY0+14, Math.min(GY1-14, ball.y + Math.sin(G.t/22 + p.y)*kerr));
         moveBot(p, kx, kyy, false);
         slot++;
         continue;
@@ -592,10 +613,11 @@ function botThink(){
           continue;
         }
         var gx = t===0?PX1:PX0, gy=(GY0+GY1)/2;
+        var D = DIFFS[BOT_DIFF];
         if(req){
           kickToward(p, req.x, req.y, PASS_SPD); req.passReq=0;
-        } else if(Math.abs(p.x-gx) < 320){
-          kickToward(p, gx, gy + rnd(-GOAL_H*0.32, GOAL_H*0.32), SHOOT_SPD);
+        } else if(Math.abs(p.x-gx) < D.shootRange){
+          kickToward(p, gx, gy + rnd(-GOAL_H*D.aimErr, GOAL_H*D.aimErr), SHOOT_SPD);
         } else if(Math.random()<0.012){
           var m = nearestMate(p);
           if(m) kickToward(p, m.x, m.y, PASS_SPD);
@@ -604,7 +626,7 @@ function botThink(){
           moveBot(p, gx, gy, false);
         }
       } else if(p===chaser){
-        var sprint = dist(p,ball) > 120 && p.stamina > 35 && !p.lock;
+        var sprint = DIFFS[BOT_DIFF].sprint && dist(p,ball) > 120 && p.stamina > 35 && !p.lock;
         moveBot(p, ball.x, ball.y, sprint);
       } else {
         // dizil: topun konumuna göre kaydırılmış formasyon
@@ -635,7 +657,7 @@ function kickToward(p, tx, ty, spd){
   ball.cw=null; ball.ct=0;
   G.ko=false;
   p.flash=160;
-  p.kcd=350;
+  p.kcd = DIFFS[BOT_DIFF].kcd;
 }
 
 /* ================= AĞ ================= */
@@ -689,6 +711,7 @@ function hostOnData(conn, msg){
     if(msg.pw===SET_PW){
       if(typeof msg.sp==='number') SPD_P = Math.min(2, Math.max(0.5, msg.sp));
       if(typeof msg.sb==='number') SPD_B = Math.min(2, Math.max(0.5, msg.sb));
+      if(typeof msg.bd==='number') BOT_DIFF = Math.min(2, Math.max(0, Math.round(msg.bd)));
       if(msg.tp) G.paused = !G.paused;
     }
   } else if(msg.t==='chat'){
@@ -723,7 +746,7 @@ function broadcast(){
         x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0,
         fl:(p.flash>0 || p.glow)?1:0 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
-    s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B],
+    s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF],
     ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam };
   for(var k in conns){ try{ conns[k].send(st); }catch(e){} }
 }
@@ -742,7 +765,7 @@ function startClient(code){
       else if(msg.t==='chatb'){ addChat(msg.n, msg.tm, msg.x, !!msg.sy); }
       else if(msg.t==='st'){
         G = msg;
-        if(msg.cf){ SPD_P=msg.cf[0]; SPD_B=msg.cf[1]; }
+        if(msg.cf){ SPD_P=msg.cf[0]; SPD_B=msg.cf[1]; if(msg.cf.length>2) BOT_DIFF=msg.cf[2]; }
         if(!Gr) Gr = JSON.parse(JSON.stringify(msg));
       }
     });
@@ -1056,6 +1079,7 @@ function readMenu(){
     setField(el('fieldSel').value);
     SPD_P = parseInt(el('pspdInp').value, 10) / 100;
     SPD_B = parseInt(el('bspdInp').value, 10) / 100;
+    BOT_DIFF = parseInt(el('diffSel').value, 10);
   }
 }
 
@@ -1135,6 +1159,7 @@ function syncPanel(){
   el('gbInp').value = Math.round(SPD_B*100);
   el('gpVal').textContent = Math.round(SPD_P*100)+'%';
   el('gbVal').textContent = Math.round(SPD_B*100)+'%';
+  el('gdSel').value = ''+BOT_DIFF;
 }
 
 el('pwBtn').onclick = function(){
@@ -1154,11 +1179,13 @@ function applyLive(){
   var sb = parseInt(el('gbInp').value,10)/100;
   el('gpVal').textContent = Math.round(sp*100)+'%';
   el('gbVal').textContent = Math.round(sb*100)+'%';
-  if(role==='host'){ SPD_P=sp; SPD_B=sb; }
-  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb}); }
+  var bd = parseInt(el('gdSel').value,10);
+  if(role==='host'){ SPD_P=sp; SPD_B=sb; BOT_DIFF=bd; }
+  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, bd:bd}); }
 }
 el('gpInp').oninput = applyLive;
 el('gbInp').oninput = applyLive;
+el('gdSel').onchange = applyLive;
 
 el('pauseBtn2').onclick = function(){
   if(role==='host'){ G.paused = !G.paused; }
