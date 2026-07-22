@@ -89,9 +89,8 @@
   /* olcekleme */
   #gameScale { transform-origin: top center; }
   #fsBtn { flex:0 0 auto; padding:5px 12px; font-size:12px; }
-  #gameWrap:fullscreen, #gameWrap:-webkit-full-screen {
-    background:#1B2125; justify-content:center; width:100vw; height:100vh; margin:0;
-  }
+  html:fullscreen, html:-webkit-full-screen { background:#1B2125; }
+  html:fullscreen body, html:-webkit-full-screen body { min-height:100vh; justify-content:center; background:#1B2125; }
 
   /* LOBI */
   #lobby { display:none; margin-top:24px; width:860px; }
@@ -313,9 +312,9 @@ var matchMins = 0;                                  // 0 = suresiz
 var PEN_W = 114, PEN_EXT = 45;                      // ceza sahasi: derinlik ve kale ustu/alti tasma
 var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:1, mins:0, spdP:1, spdB:1 }, started:false };
 var DIFFS = [
-  { spd:0.75, aimErr:0.55, shootRange:230, sprint:false, kcd:650, keepErr:34 },  // kolay
-  { spd:1.0,  aimErr:0.32, shootRange:320, sprint:true,  kcd:350, keepErr:12 },  // normal
-  { spd:1.2,  aimErr:0.14, shootRange:410, sprint:true,  kcd:240, keepErr:0  }   // zor
+  { spd:0.85, aimErr:0.42, shootRange:300, sprint:true,  sprintDist:110, kcd:520, keepErr:26, react:0.85 },  // kolay
+  { spd:1.05, aimErr:0.22, shootRange:420, sprint:true,  sprintDist:55,  kcd:300, keepErr:9,  react:1.0  },  // normal
+  { spd:1.25, aimErr:0.09, shootRange:560, sprint:true,  sprintDist:30,  kcd:210, keepErr:0,  react:1.0  }   // zor
 ];
 var TICK_MS = 1000/60, NET_MS = 1000/30;
 
@@ -742,21 +741,45 @@ function botThink(){
           if(botKick(p, req.x, req.y, PASS_SPD, 0.35)){ req.passReq=0; }
           else { var ls=lineupSpot(req.x, req.y); moveBot(p, ls.x, ls.y, false); }
         } else if(Math.abs(p.x-gx) < D.shootRange + BOT_STYLE[t]*40){
-          // sut: rakip kaleye dogru taraftan yaslandiysa vur; yoksa arkasina gecip vurusu hazirla
+          // sut: gole yaklastikca daha atilgan (dusuk hizalanma esigi)
+          var distGoal = Math.abs(p.x-gx);
           var aimY = gy + rnd(-GOAL_H*D.aimErr, GOAL_H*D.aimErr);
-          if(!botKick(p, gx, aimY, SHOOT_SPD, 0.6)){
-            var ls2=lineupSpot(gx, aimY); moveBot(p, ls2.x, ls2.y, false);
+          var minD = distGoal < 170 ? 0.15 : (distGoal < 320 ? 0.35 : 0.5);
+          if(!botKick(p, gx, aimY, SHOOT_SPD, minD)){
+            var ls2=lineupSpot(gx, aimY);
+            var lSprint = D.sprint && p.stamina>18 && !p.lock;
+            moveBot(p, ls2.x, ls2.y, lSprint);
           }
-        } else if(Math.random()<0.010){
+        } else if(Math.random()<0.004){
           var m = nearestMate(p);
           if(m){ if(!botKick(p, m.x, m.y, PASS_SPD, 0.4)){ var ls3=lineupSpot(m.x,m.y); moveBot(p, ls3.x, ls3.y, false); } }
         } else {
-          // top sür: kaleye doğru yürü
-          moveBot(p, gx, gy, false);
+          // top sür: rakip kaleye doğru, stamina varsa sprintle (gol odakli)
+          var drSprint = D.sprint && p.stamina > 20 && !p.lock;
+          moveBot(p, gx, gy, drSprint);
         }
       } else if(p===chaser){
-        var sprint = DIFFS[BOT_DIFF].sprint && dist(p,ball) > 120 && p.stamina > 35 && !p.lock;
-        moveBot(p, ball.x, ball.y, sprint);
+        var Dc = DIFFS[BOT_DIFF];
+        // hucum ucuncu bolgesinde topa erisince gordugu an sut cek (dribbleyip kaptirma)
+        var gx2 = t===0?PX1:PX0, gy2=(GY0+GY1)/2;
+        var inFinal = t===0 ? (ball.x > W*0.52) : (ball.x < W*0.48);
+        var shotTaken = false;
+        if(inFinal){
+          // kaleciden uzak koseyi hedefle
+          var oppKeeper = null;
+          for(var ok=0; ok<G.players.length; ok++){ var q2=G.players[ok]; if(q2.team!==t && q2.keeper){ oppKeeper=q2; break; } }
+          var aimY2;
+          if(oppKeeper){ aimY2 = (oppKeeper.y > gy2) ? (GY0+18) : (GY1-18); }
+          else aimY2 = gy2 + rnd(-GOAL_H*Dc.aimErr, GOAL_H*Dc.aimErr);
+          aimY2 += rnd(-GOAL_H*Dc.aimErr*0.5, GOAL_H*Dc.aimErr*0.5);
+          var dg = Math.abs(ball.x - gx2);
+          var md = dg<170 ? 0.1 : (dg<340 ? 0.28 : 0.42);
+          shotTaken = botKick(p, gx2, aimY2, SHOOT_SPD, md);
+        }
+        if(!shotTaken){
+          var sprint = Dc.sprint && dist(p,ball) > Dc.sprintDist && p.stamina > 12 && !p.lock;
+          moveBot(p, ball.x, ball.y, sprint);
+        }
       } else {
         // dizil: topun konumuna göre kaydırılmış formasyon
         var frac=(slot+1)/(team.length+1);
@@ -766,7 +789,15 @@ function botThink(){
         homeX += (t===0 ? shift : -shift);
         var tx = homeX + (ball.x - W/2)*STYLE_PUSH[BOT_STYLE[t]];
         var ty = PY0 + frac*(PY1-PY0) + (ball.y - H/2)*0.25;
-        moveBot(p, tx, ty, false);
+        // top kendi yari sahasinda/serbestse ve bu bot 2. en yakinsa baski yap (zor/normal)
+        var db = dist(p, ball);
+        if(BOT_DIFF>=1 && db < 200 && p.role!=='def'){
+          var closerCount=0;
+          for(var ci=0;ci<team.length;ci++) if(team[ci]!==p && team[ci]!==keeper && dist(team[ci],ball)<db) closerCount++;
+          if(closerCount<=1){ tx=ball.x; ty=ball.y; }  // ikinci adam da baskiya gitsin
+        }
+        var fSprint = DIFFS[BOT_DIFF].sprint && p.stamina>30 && !p.lock && Math.hypot(tx-p.x,ty-p.y)>140;
+        moveBot(p, tx, ty, fSprint);
       }
       slot++;
     }
@@ -790,8 +821,12 @@ function botKick(p, ax, ay, spd, minDot){
   var cx=ball.x-p.x, cy=ball.y-p.y, cl=Math.sqrt(cx*cx+cy*cy)||1; cx/=cl; cy/=cl;
   var dx=ax-ball.x, dy=ay-ball.y, dl=Math.sqrt(dx*dx+dy*dy)||1; dx/=dl; dy/=dl;
   if((cx*dx+cy*dy) < (minDot==null?0.5:minDot)) return false; // dogru taraftan degil
+  // temas yonu ile hedef yonunu zorluga gore harmanla: sert botlar hedefe daha yakin nisan alir
+  var aw = 0.30 + BOT_DIFF*0.30;           // kolay 0.30, normal 0.60, zor 0.90
+  var mx = cx*(1-aw) + dx*aw, my = cy*(1-aw) + dy*aw;
+  var ml = Math.sqrt(mx*mx+my*my)||1; mx/=ml; my/=ml;
   var s = spd*SPD_B;
-  ball.vx = cx*s; ball.vy = cy*s;    // top, temas yonune gider (oyuncudaki gibi saf fizik)
+  ball.vx = mx*s; ball.vy = my*s;
   ball.cw=null; ball.ct=0;
   G.ko=false;
   p.flash=160;
@@ -1651,14 +1686,15 @@ el('pauseBtn2').onclick = function(){
 
 
 el('fsBtn').onclick = function(){
-  var w = el('gameWrap');
-  var req = w.requestFullscreen || w.webkitRequestFullscreen || w.mozRequestFullScreen || w.msRequestFullscreen;
+  var el0 = document.documentElement;
+  var req = el0.requestFullscreen || el0.webkitRequestFullscreen || el0.mozRequestFullScreen || el0.msRequestFullscreen;
   var exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
   try {
-    if(!isFs()){ if(req) req.call(w); }
+    if(!isFs()){ if(req){ var pr = req.call(el0); if(pr && pr.catch) pr.catch(function(){}); } }
     else { if(exit) exit.call(document); }
   } catch(e){}
   setTimeout(fitScale, 120);
+  setTimeout(fitScale, 400);
 };
 
 el('lobbyBtn').onclick = function(){
