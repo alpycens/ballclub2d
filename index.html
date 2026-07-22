@@ -695,20 +695,30 @@ function botThink(){
         for(var j=0;j<team.length;j++)
           if(!team[j].bot && team[j].passReq>0 && team[j]!==p){ req=team[j]; break; }
         if(p===keeper){
-          if(req){ kickToward(p, req.x, req.y, PASS_SPD); req.passReq=0; }
-          else kickToward(p, t===0 ? W*0.72 : W*0.28, PY0 + rnd(0.2,0.8)*(PY1-PY0), SHOOT_SPD);
+          var kax = t===0 ? W*0.72 : W*0.28, kay = PY0 + rnd(0.25,0.75)*(PY1-PY0);
+          if(req){ kax=req.x; kay=req.y; }
+          if(!botKick(p, kax, kay, SHOOT_SPD, -1)){    // kaleci her yonden temizler
+            moveBot(p, lineupSpot(kax,kay).x, lineupSpot(kax,kay).y, false);
+          } else if(req){ req.passReq=0; }
           slot++;
           continue;
         }
         var gx = t===0?PX1:PX0, gy=(GY0+GY1)/2;
         var D = DIFFS[BOT_DIFF];
         if(req){
-          kickToward(p, req.x, req.y, PASS_SPD); req.passReq=0;
+          // insan pas istedi: topa dogru taraftan yaslandiysa insana pas (top duz gider,
+          // arada rakip varsa ona carpar). Hizali degilse topun arkasina gecip konumlan.
+          if(botKick(p, req.x, req.y, PASS_SPD, 0.35)){ req.passReq=0; }
+          else { var ls=lineupSpot(req.x, req.y); moveBot(p, ls.x, ls.y, false); }
         } else if(Math.abs(p.x-gx) < D.shootRange + BOT_STYLE[t]*40){
-          kickToward(p, gx, gy + rnd(-GOAL_H*D.aimErr, GOAL_H*D.aimErr), SHOOT_SPD);
-        } else if(Math.random()<0.012){
+          // sut: rakip kaleye dogru taraftan yaslandiysa vur; yoksa arkasina gecip vurusu hazirla
+          var aimY = gy + rnd(-GOAL_H*D.aimErr, GOAL_H*D.aimErr);
+          if(!botKick(p, gx, aimY, SHOOT_SPD, 0.6)){
+            var ls2=lineupSpot(gx, aimY); moveBot(p, ls2.x, ls2.y, false);
+          }
+        } else if(Math.random()<0.010){
           var m = nearestMate(p);
-          if(m) kickToward(p, m.x, m.y, PASS_SPD);
+          if(m){ if(!botKick(p, m.x, m.y, PASS_SPD, 0.4)){ var ls3=lineupSpot(m.x,m.y); moveBot(p, ls3.x, ls3.y, false); } }
         } else {
           // top sür: kaleye doğru yürü
           moveBot(p, gx, gy, false);
@@ -737,16 +747,30 @@ function moveBot(p, tx, ty, sprint){
   if(sprint) p.in.s=1;
 }
 
-function kickToward(p, tx, ty, spd){
-  if(p.kcd>0) return;
+// bot vurusu: tam oyuncu gibi -> kuvvet, botun MERKEZINDEN topa temas yonunde uygulanir.
+// bot ancak topa dogru taraftan yaslanmissa (temas yonu hedefe yakinsa) vurabilir.
+// aksi halde false doner; bot topu surerek konumlanir. minDot: hizalanma esigi.
+function botKick(p, ax, ay, spd, minDot){
+  if(p.kcd>0) return false;
   var ball=G.ball;
-  var dx=tx-ball.x, dy=ty-ball.y, l=Math.sqrt(dx*dx+dy*dy)||1;
-  spd *= SPD_B;
-  ball.vx=dx/l*spd; ball.vy=dy/l*spd;
+  if(dist(p, ball) > KICK_RANGE) return false;
+  var cx=ball.x-p.x, cy=ball.y-p.y, cl=Math.sqrt(cx*cx+cy*cy)||1; cx/=cl; cy/=cl;
+  var dx=ax-ball.x, dy=ay-ball.y, dl=Math.sqrt(dx*dx+dy*dy)||1; dx/=dl; dy/=dl;
+  if((cx*dx+cy*dy) < (minDot==null?0.5:minDot)) return false; // dogru taraftan degil
+  var s = spd*SPD_B;
+  ball.vx = cx*s; ball.vy = cy*s;    // top, temas yonune gider (oyuncudaki gibi saf fizik)
   ball.cw=null; ball.ct=0;
   G.ko=false;
   p.flash=160;
   p.kcd = DIFFS[BOT_DIFF].kcd;
+  return true;
+}
+
+// botu topun, hedefe gore arka tarafina konumlandiracak nokta
+function lineupSpot(ax, ay){
+  var ball=G.ball;
+  var dx=ball.x-ax, dy=ball.y-ay, l=Math.sqrt(dx*dx+dy*dy)||1;
+  return { x: ball.x + dx/l*(PR+BR+2), y: ball.y + dy/l*(PR+BR+2) };
 }
 
 /* ================= AĞ ================= */
@@ -1118,6 +1142,12 @@ function renderLobby(){
       var tb=document.createElement('span'); tb.className='tag'; tb.textContent='BOT'; row.appendChild(tb);
     }
     if(role==='host' && s.bot){
+      var pb=document.createElement('button'); pb.className='xb';
+      pb.style.cssText='width:auto;padding:2px 6px;background:#3C4A52';
+      pb.textContent = (s.pos==='gk') ? 'K→O' : 'O→K';
+      pb.title = (s.pos==='gk') ? 'Oyuncu yap' : 'Kaleci yap';
+      pb.onclick=function(){ s.pos = (s.pos==='gk')?'fld':'gk'; rosterChanged(); pushLobby(); renderLobby(); };
+      row.appendChild(pb);
       var xb=document.createElement('button'); xb.className='xb'; xb.textContent='×';
       xb.onclick=function(){ removeBot(s.id); };
       row.appendChild(xb);
