@@ -78,6 +78,12 @@
     <option value="3" selected>3v3</option>
     <option value="4">4v4</option>
   </select>
+  <label>Saha boyutu</label>
+  <select id="fieldSel">
+    <option value="small">Small</option>
+    <option value="big" selected>Big</option>
+    <option value="huge">Huge</option>
+  </select>
   <label>Maç kaç golde biter</label>
   <select id="goalSel">
     <option value="3">3 gol</option>
@@ -144,8 +150,9 @@
 "use strict";
 /* ================= SABİTLER ================= */
 var W = 1000, H = 520;
-var PX0 = 60, PX1 = 940, PY0 = 60, PY1 = 460;      // saha çizgileri
+var PX0 = 55, PX1 = 945, PY0 = 55, PY1 = 465;      // saha çizgileri
 var GOAL_H = 150, GY0 = (PY0+PY1)/2 - GOAL_H/2, GY1 = (PY0+PY1)/2 + GOAL_H/2;
+var fieldSize = 'big';
 var GOAL_DEPTH = 34;
 var PR = 15, BR = 8;                                // yarıçaplar
 var KICK_RANGE = PR + BR + 6;
@@ -172,6 +179,18 @@ var running = false, lastT = 0, acc = 0, netAcc = 0;
 
 var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 
+function setField(fs){
+  fieldSize = fs;
+  if(fs==='small'){ W=760; H=400; GOAL_H=115; }
+  else if(fs==='huge'){ W=1240; H=650; GOAL_H=190; }
+  else { fieldSize='big'; W=1000; H=520; GOAL_H=150; }
+  PX0=55; PX1=W-55; PY0=55; PY1=H-55;
+  GY0=(PY0+PY1)/2-GOAL_H/2; GY1=(PY0+PY1)/2+GOAL_H/2;
+  if(cv){ cv.width=W; cv.height=H; }
+  el('topBar').style.width=W+'px';
+  el('botBar').style.width=W+'px';
+}
+
 /* ================= YARDIMCI ================= */
 function rnd(a,b){ return a + Math.random()*(b-a); }
 function dist(a,b){ var dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
@@ -187,7 +206,7 @@ function newPlayer(id, name, team, bot){
 }
 
 function initGame(){
-  G = { players:[], ball:{x:W/2,y:H/2,vx:0,vy:0}, score:[0,0],
+  G = { players:[], ball:{x:W/2,y:H/2,vx:0,vy:0,cw:null,ct:0}, score:[0,0],
         phase:'play', ptimer:0, msg:'', over:false, paused:false };
   // host oyuncusu kırmızı
   G.players.push(newPlayer(myPid, myName, 0, false));
@@ -223,6 +242,7 @@ function trimBots(){
 
 function resetPositions(){
   G.ball.x = W/2; G.ball.y = H/2; G.ball.vx = 0; G.ball.vy = 0;
+  G.ball.cw = null; G.ball.ct = 0;
   for(var t=0;t<2;t++){
     var team = G.players.filter(function(p){return p.team===t;});
     for(var i=0;i<team.length;i++){
@@ -308,6 +328,26 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
 
   // top
   var ball = G.ball;
+  // falso: sutu ceken oyuncu, top havadayken yon tuslariyla yana buker
+  if(ball.ct > 0){
+    ball.ct -= dt*TICK_MS;
+    var ow = null;
+    for(var oi=0;oi<G.players.length;oi++) if(G.players[oi].id===ball.cw){ ow=G.players[oi]; break; }
+    if(ow && play){
+      var cix = (ow.in.r?1:0)-(ow.in.l?1:0), ciy = (ow.in.d?1:0)-(ow.in.u?1:0);
+      if(cix!==0 || ciy!==0){
+        var bl = Math.sqrt(ball.vx*ball.vx+ball.vy*ball.vy);
+        if(bl > 0.6){
+          var ux=ball.vx/bl, uy=ball.vy/bl;
+          var dot=cix*ux+ciy*uy;
+          var perx=cix-dot*ux, pery=ciy-dot*uy;
+          var pl=Math.sqrt(perx*perx+pery*pery);
+          if(pl>0.01){ ball.vx += perx/pl*0.085*dt; ball.vy += pery/pl*0.085*dt; }
+        }
+      }
+    }
+    if(ball.ct<=0){ ball.cw=null; ball.ct=0; }
+  }
   ball.x += ball.vx*dt; ball.y += ball.vy*dt;
   ball.vx *= Math.pow(BDAMP, dt); ball.vy *= Math.pow(BDAMP, dt);
 
@@ -320,8 +360,9 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
       ball.x = q.x + nx2*(PR+BR);
       ball.y = q.y + ny2*(PR+BR);
       var rel = (ball.vx-q.vx)*nx2 + (ball.vy-q.vy)*ny2;
-      if(rel<0){ ball.vx -= 1.7*rel*nx2; ball.vy -= 1.7*rel*ny2; }
-      ball.vx += q.vx*0.25; ball.vy += q.vy*0.25;
+      if(rel<0){ ball.vx -= 1.3*rel*nx2; ball.vy -= 1.3*rel*ny2; }
+      ball.vx += q.vx*0.18; ball.vy += q.vy*0.18;
+      ball.cw = null; ball.ct = 0; // dokunus falsoyu bitirir
     }
   }
 
@@ -379,6 +420,8 @@ function tryKick(p, kind){
   var l = Math.sqrt(tx*tx+ty*ty) || 1;
   spd *= SPD_B;
   ball.vx = tx/l*spd; ball.vy = ty/l*spd;
+  if(kind==='shoot'){ ball.cw = p.id; ball.ct = 850; }
+  else { ball.cw = null; ball.ct = 0; }
   p.kcd = 220;
   return true;
 }
@@ -458,6 +501,7 @@ function kickToward(p, tx, ty, spd){
   var dx=tx-ball.x, dy=ty-ball.y, l=Math.sqrt(dx*dx+dy*dy)||1;
   spd *= SPD_B;
   ball.vx=dx/l*spd; ball.vy=dy/l*spd;
+  ball.cw=null; ball.ct=0;
   p.kcd=350;
 }
 
@@ -498,7 +542,7 @@ function hostOnData(conn, msg){
       G.players.push(np);
     }
     np.in={u:0,d:0,l:0,r:0,s:0};
-    conn.send({t:'wel', pid:conn.peer});
+    conn.send({t:'wel', pid:conn.peer, fs:fieldSize});
   } else if(msg.t==='in'){
     var p = G.players.find(function(q){return q.id===conn.peer;});
     if(p) p.in = msg.k;
@@ -538,7 +582,7 @@ function startClient(code){
       hostConn.send({t:'hi', n:myName});
     });
     hostConn.on('data', function(msg){
-      if(msg.t==='wel'){ ok=true; myPid=msg.pid; roomCode=code.toUpperCase(); startGameUI();
+      if(msg.t==='wel'){ ok=true; myPid=msg.pid; roomCode=code.toUpperCase(); setField(msg.fs); startGameUI();
         el('roomInfo').textContent='Odaya bağlı: '+roomCode; el('copyBtn').style.display=''; }
       else if(msg.t==='st'){ G = msg; if(!Gr) Gr = JSON.parse(JSON.stringify(msg)); }
     });
@@ -622,9 +666,11 @@ function render(v){
   for(var i=0;i<v.p.length;i++){
     var p=v.p[i];
     var me = (p.i===myPid);
+    var ddx=p.x-bx, ddy=p.y-by;
+    var canKick = me && Math.sqrt(ddx*ddx+ddy*ddy) < KICK_RANGE + 2;
     ctx.fillStyle = p.t===0 ? '#E56E56' : '#5689E5';
-    ctx.strokeStyle = me ? '#FFFFFF' : '#1B2125';
-    ctx.lineWidth = me ? 3 : 2;
+    ctx.strokeStyle = canKick ? '#FFFFFF' : '#1B2125';
+    ctx.lineWidth = canKick ? 3 : 2;
     ctx.beginPath(); ctx.arc(p.x,p.y,PR,0,Math.PI*2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = me ? '#FFFFFF' : 'rgba(255,255,255,0.85)';
     ctx.font = (me?'bold ':'')+'11px Segoe UI, Arial';
@@ -721,6 +767,7 @@ function readMenu(){
   myName = el('nameInp').value.trim() || 'Oyuncu';
   teamSize = parseInt(el('sizeSel').value, 10);
   maxGoals = parseInt(el('goalSel').value, 10);
+  if(role!=='client') setField(el('fieldSel').value);
   SPD_P = parseInt(el('pspdInp').value, 10) / 100;
   SPD_B = parseInt(el('bspdInp').value, 10) / 100;
 }
@@ -745,10 +792,10 @@ el('joinBtn').onclick = function(){
 };
 
 el('joinGoBtn').onclick = function(){
+  role='client';
   readMenu();
   var code = el('codeInp').value.trim();
   if(code.length<5){ menuMsg('5 haneli oda kodunu gir.'); return; }
-  role='client';
   menuMsg('Bağlanılıyor...');
   startClient(code);
 };
