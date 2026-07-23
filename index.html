@@ -147,6 +147,15 @@
   .lobSlot .xb { flex:0 0 auto; width:22px; padding:2px 0; font-size:12px; background:#7A3C3C; line-height:1; }
   .lobBtns { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
   .lobBtns button { flex:0 0 auto; padding:5px 10px; font-size:12px; }
+  #kitBox { margin-top:14px; padding:10px 12px; background:#1F272C; border:1px solid #3C4A52; border-radius:6px; }
+  #lobKit { background:#252E33; border:1px solid #3C4A52; border-top:none; padding:10px 16px; }
+  .kitRow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px; }
+  .kitRow label { font-size:12px; color:#9FB3BB; margin:0; }
+  .kitRow input[type=number] { width:70px; padding:6px 8px; background:#1B2125; color:#E8E8E8;
+    border:1px solid #3C4A52; border-radius:4px; font-size:13px; }
+  .kitSw { width:22px; height:22px; border-radius:50%; border:2px solid #3C4A52; cursor:pointer; padding:0; }
+  .kitSw.sel { border-color:#FFFFFF; box-shadow:0 0 0 2px rgba(255,255,255,0.25); }
+  #kitColors, #lkitColors { display:flex; gap:6px; flex-wrap:wrap; }
   #lobStats { background:#252E33; border:1px solid #3C4A52; border-top:none; padding:10px 16px; }
   #lobStats .sttop { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
   #lobStats #lstatLeft { font-size:11px; color:#E5B356; }
@@ -183,6 +192,14 @@
     <div class="sttop"><span class="settitle">KARAKTER STATLARI</span><span id="statLeft"></span></div>
     <div id="statRows"></div>
     <button id="statReset">Standarda Dön (hepsi 3)</button>
+  </div>
+  <div id="kitBox">
+    <div class="settitle">FORMA</div>
+    <div class="kitRow">
+      <label>Numara</label>
+      <input id="kitNum" type="number" min="1" max="99" value="10">
+      <div id="kitColors"></div>
+    </div>
   </div>
   <div class="btnrow">
     <button class="primary" id="soloBtn">Tek Başına</button>
@@ -228,6 +245,14 @@
       </div>
     </div>
   </div>
+  <div id="lobKit">
+    <div class="settitle" style="font-size:11px;letter-spacing:2px;color:#CDE6B4">FORMAM</div>
+    <div class="kitRow">
+      <label>Numara</label>
+      <input id="lkitNum" type="number" min="1" max="99" value="10">
+      <div id="lkitColors"></div>
+    </div>
+  </div>
   <div id="lobStats">
     <div class="sttop"><span class="settitle">STATLARIM</span><span id="lstatLeft"></span></div>
     <div id="lstatRows"></div>
@@ -245,7 +270,7 @@
         <select id="ldiffSel"><option value="0">Beginner</option><option value="1">Intermediate</option><option value="2" selected>Advanced</option><option value="3">Expert</option><option value="4">Master</option></select>
       </div>
       <div class="cfgItem hostOnly"><label>Bitiş golü</label>
-        <select id="lgoalSel"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select>
+        <select id="lgoalSel"><option value="0">Sınırsız</option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="7">7</option><option value="10">10</option></select>
       </div>
       <div class="cfgItem hostOnly"><label>Süre</label>
         <select id="lminSel"><option value="0" selected>Süresiz</option><option value="1">1 dk</option><option value="2">2 dk</option><option value="3">3 dk</option><option value="5">5 dk</option></select>
@@ -327,6 +352,20 @@
         <option value="3">Expert</option>
         <option value="4">Master</option>
       </select>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid #3C4A52">
+        <label style="color:#CDE6B4;letter-spacing:1px;font-size:11px">BOT STATLARI</label>
+        <div style="display:flex;gap:6px;margin:6px 0">
+          <select id="bsLvl" style="flex:1;padding:5px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:12px">
+            <option value="0">Beginner</option><option value="1">Intermediate</option>
+            <option value="2" selected>Advanced</option><option value="3">Expert</option><option value="4">Master</option>
+          </select>
+          <select id="bsPos" style="flex:1;padding:5px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:12px">
+            <option value="gk">Kaleci</option><option value="def">Defans</option>
+            <option value="mid" selected>Orta Saha</option><option value="fwd">Forvet</option>
+          </select>
+        </div>
+        <div id="bsRows"></div>
+      </div>
       <button id="cfgExportBtn" style="background:#3C6E4A">Ayarları JSON İndir</button>
       <div id="cfgSrc" style="font-size:10px;color:#6E8089;margin-top:6px;line-height:1.4"></div>
       <button id="pauseBtn2">Maçı Durdur</button>
@@ -335,7 +374,7 @@
   <canvas id="cv" width="1000" height="520"></canvas>
   <div id="botBar">
     <div id="stamWrap">SPRINT <div id="stamOuter"><div id="stamFill"></div></div></div>
-    <div id="ctrlHint">WASD/Yön: hareket · X: pas · Space: şut · Shift: sprint · C: takım boşa kaçsın · V: takım baskı yapsın</div>
+    <div id="ctrlHint">WASD/Yön: hareket · X: pas · Space: şut · Alt: ara pas · Shift: sprint · C: boşa kaç · V: baskı</div>
     <button id="leaveBtn">Menüye Dön</button>
   </div>
   <div id="chatWrap">
@@ -364,6 +403,59 @@ var ACC = 0.30, PDAMP = 0.925, BASE_MAX = 2.55, SPRINT_MAX = 4.25;
 var G_SPRINT = 1, G_CURVE = 1, G_SHOT = 1;
 // karakter statlari: 5 stat, her biri 1-7, toplam 20 puan (standart 3)
 var DEF_STATS = { shot:3, curve:3, sprint:3, drib:3, power:3 };
+var POS_KEYS = ['gk','def','mid','fwd'];
+var POS_TR = { gk:'Kaleci', def:'Defans', mid:'Orta Saha', fwd:'Forvet' };
+
+// Bot statlari: [seviye][mevki] -> stat seti. Ayarlar bolumunden duzenlenir,
+// settings.json ile disa aktarilinca herkeste ayni olur.
+function defaultBotStats(){
+  var t = {};
+  for(var d=0; d<5; d++){
+    t[d] = {};
+    for(var i=0;i<POS_KEYS.length;i++){
+      var pos = POS_KEYS[i];
+      var base = { shot:3, curve:3, sprint:3, drib:3, power:3 };
+      // mevkiye gore hafif egilim
+      if(pos==='gk'){ base.power=4; base.sprint=3; base.shot=4; base.drib=2; base.curve=2; }
+      else if(pos==='def'){ base.power=4; base.drib=3; base.shot=3; base.sprint=3; base.curve=2; }
+      else if(pos==='mid'){ base.drib=4; base.curve=3; base.sprint=3; base.shot=3; base.power=3; }
+      else { base.shot=4; base.sprint=4; base.drib=3; base.curve=3; base.power=2; }
+      // seviyeye gore kademeli guclenme (beginner -1, master +1 civari)
+      var bump = [-1, 0, 0, 1, 1][d];
+      ['shot','curve','sprint','drib','power'].forEach(function(k){
+        base[k] = Math.max(1, Math.min(7, base[k] + bump));
+      });
+      t[d][pos] = base;
+    }
+  }
+  return t;
+}
+var BOT_STATS = defaultBotStats();   // acilista localStorage'dan yuklenir
+
+function botStatsFor(diff, pos){
+  var lvl = BOT_STATS[Math.max(0,Math.min(4,diff))] || BOT_STATS[2];
+  return (lvl && lvl[pos]) ? lvl[pos] : DEF_STATS;
+}
+function cleanBotStat(s){
+  var o = {};
+  ['shot','curve','sprint','drib','power'].forEach(function(k){
+    var v = (s && typeof s[k]==='number') ? Math.round(s[k]) : 3;
+    o[k] = Math.max(1, Math.min(7, v));
+  });
+  return o;
+}
+function cleanBotStatsTable(t){
+  var out = defaultBotStats();
+  if(!t) return out;
+  for(var d=0; d<5; d++){
+    if(!t[d]) continue;
+    for(var i=0;i<POS_KEYS.length;i++){
+      var pos = POS_KEYS[i];
+      if(t[d][pos]) out[d][pos] = cleanBotStat(t[d][pos]);
+    }
+  }
+  return out;
+}
 var STAT_KEYS = ['shot','curve','sprint','drib','power'];
 var STAT_LABELS = { shot:'Şut gücü', curve:'Plase / falso', sprint:'Sprint hızı', drib:'Dribbling hızı', power:'Güç (itme/direnç)' };
 var STAT_MIN = 1, STAT_MAX = 7, STAT_TOTAL = 20;
@@ -380,8 +472,8 @@ function cleanStats(s){
   return o;
 }
 function statF(v, per){ return 1 + (v-3)*per; }
-function applyStats(p, s){
-  var st = cleanStats(s);
+function applyStats(p, s, raw){
+  var st = raw ? cleanBotStat(s) : cleanStats(s);
   p.stats   = st;
   p.fShot   = statF(st.shot,   0.075);   // 1 -> 0.85 | 7 -> 1.30
   p.fCurve  = statF(st.curve,  0.15);    // 1 -> 0.70 | 7 -> 1.60
@@ -491,7 +583,7 @@ function penBox(t){
 function newPlayer(id, name, team, bot, stats){
   var np = { id:id, name:name, team:team, bot:bot,
            x:0, y:0, vx:0, vy:0,
-           stamina:STAM_MAX, lock:false, kcd:0, passReq:0, shootReq:0, runReq:0, pressReq:0, flash:0, keeper:false,
+           stamina:STAM_MAX, lock:false, kcd:0, passReq:0, shootReq:0, thruReq:0, cpassReq:0, cshootReq:0, pressReq:0, flash:0, keeper:false, throughKick:false,
            stats:null, fShot:1, fCurve:1, fSprint:1, fDrib:1, mass:1,
            in:{u:0,d:0,l:0,r:0,s:0}, ev:[] };
   applyStats(np, stats);
@@ -506,8 +598,10 @@ function buildGameFromRoster(){
   LOBBY.roster.forEach(function(s){
     if(s.team!==0 && s.team!==1) return;          // seyirci sahada degil
     var p = newPlayer(s.id, s.name, s.team, !!s.bot, s.bot ? null : s.stats);
+    p.kit = cleanKit(s.kit);
     p.role = s.pos || 'mid';
     p.keeper = (p.role==='gk');
+    if(s.bot) applyStats(p, botStatsFor(BOT_DIFF, p.role), true);
     G.players.push(p);
   });
   resetPositions();
@@ -567,6 +661,29 @@ function resetPositions(){
 }
 
 /* ================= FİZİK (HOST) ================= */
+// Baslama vurusunda: vurusu yapmayan takim kendi yarisinda ve orta cemberin disinda kalir.
+function enforceKickoffZones(){
+  for(var i=0;i<G.players.length;i++){
+    var p = G.players[i];
+    if(p.team === G.koTeam) continue;
+    if(p.team===0){ var l0 = W/2-(PR+4); if(p.x > l0){ p.x = l0; if(p.vx>0) p.vx = 0; } }
+    else { var l1 = W/2+(PR+4); if(p.x < l1){ p.x = l1; if(p.vx<0) p.vx = 0; } }
+    var dx = p.x-W/2, dy = p.y-H/2;
+    var d = Math.sqrt(dx*dx+dy*dy);
+    var lim = CIRCLE_R + PR;
+    if(d < lim){
+      if(d < 0.001){ dx = (p.team===0?-1:1); dy = 0; d = 1; }
+      var nx = dx/d, ny = dy/d;
+      p.x = W/2 + nx*lim;
+      p.y = H/2 + ny*lim;
+      var vn = p.vx*nx + p.vy*ny;
+      if(vn < 0){ p.vx -= vn*nx; p.vy -= vn*ny; }
+      if(p.team===0 && p.x > W/2-(PR+4)) p.x = W/2-(PR+4);
+      if(p.team===1 && p.x < W/2+(PR+4)) p.x = W/2+(PR+4);
+    }
+  }
+}
+
 // top kati bir nesne: oyuncularla ust uste binemez, iki oyuncu arasinda sikisirsa disari kacar
 function resolveBallPlayers(nearWall){
   var ball = G.ball;
@@ -688,7 +805,9 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     p.kcd = Math.max(0, p.kcd - dt*TICK_MS);
     p.passReq = Math.max(0, p.passReq - dt*TICK_MS);
     p.shootReq = Math.max(0, p.shootReq - dt*TICK_MS);
-    p.runReq = Math.max(0, p.runReq - dt*TICK_MS);
+    p.thruReq = Math.max(0, p.thruReq - dt*TICK_MS);
+    p.cpassReq = Math.max(0, p.cpassReq - dt*TICK_MS);
+    p.cshootReq = Math.max(0, p.cshootReq - dt*TICK_MS);
     p.pressReq = Math.max(0, p.pressReq - dt*TICK_MS);
     p.flash = Math.max(0, p.flash - dt*TICK_MS);
     p.glow = !p.bot && !!(p.in.s || p.in.x || p.in.sp);
@@ -791,8 +910,12 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
         if(!tryKick(p, 'shoot')) { p.shootReq = 1300; p.passReq = 0; }  // topsuzsa bota "sut cek" emri
       } else if(e==='pass'){
         if(!tryKick(p, 'pass')) { p.passReq = 1300; p.shootReq = 0; }   // topsuzsa bottan pas iste
-      } else if(e==='run'){
-        p.runReq = 3000;      // C: takim arkadaslari bosa kacsin
+      } else if(e==='through'){
+        if(!tryKick(p, 'pass')) { p.thruReq = 1300; p.passReq = 0; p.shootReq = 0; }   // ara pas iste
+      } else if(e==='cpass'){
+        if(!tryKick(p, 'cpass')) { p.cpassReq = 1300; p.passReq=0; p.shootReq=0; p.cshootReq=0; }
+      } else if(e==='cshoot'){
+        if(!tryKick(p, 'cshoot')) { p.cshootReq = 1300; p.passReq=0; p.shootReq=0; p.cpassReq=0; }
       } else if(e==='press'){
         p.pressReq = 3000;    // V: takim arkadaslari topa baski yapsin
       }
@@ -818,6 +941,10 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
   // oyuncular hareket etti: once topu katı nesne gibi disari it (uzerine binme olmasin)
   resolveBallPlayers();
 
+  // baslama vurusu kisitini carpismalardan SONRA da uygula
+  // (oyuncu-oyuncu itismesi rakibi cembere sokabiliyordu)
+  if(G.ko && play) enforceKickoffZones();
+
   // top
   var ball = G.ball;
   // falso: sutu ceken oyuncu, top havadayken yon tuslariyla yana buker
@@ -841,14 +968,14 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
         // SPIN FIZIGI: spin aninda degismez. Ters yone gecmek icin once
         // mevcut spinin sonmesi gerekir -> saga falso verirken sola cevirmek zordur.
         var rate = 0.055;
-        if(want !== 0 && want*ball.spin < 0) rate = 0.022;   // ters yon: cok yavas
+        if(want !== 0 && want*ball.spin < 0) rate = 0.010;   // ters yon: cok daha zor
         else if(want === 0) rate = 0.028;                    // birakinca yavas soner
         ball.spin += (want - ball.spin) * rate * dt;
         if(ball.spin > 1) ball.spin = 1;
         if(ball.spin < -1) ball.spin = -1;
         // magnus: spin miktarina gore gidise dik kuvvet
         var perx = -uy, pery = ux;
-        var cf2 = 0.115 * (ow.fCurve||1) * G_CURVE * ball.spin;
+        var cf2 = 0.092 * (ow.fCurve||1) * G_CURVE * ball.spin;
         ball.vx += perx*cf2*dt; ball.vy += pery*cf2*dt;
       }
     }
@@ -918,7 +1045,7 @@ function endMatchByTime(){
 
 function scoreGoal(team){
   G.score[team]++;
-  if(G.score[team] >= maxGoals){
+  if(maxGoals > 0 && G.score[team] >= maxGoals){
     G.phase='end'; G.ptimer=4000;
     G.msg = (team===0?'KIRMIZI':'MAVİ') + ' MAÇI KAZANDI!';
     G.koTeam = 0; // yeni mac hep kirmizi baslar
@@ -952,11 +1079,14 @@ function tryKick(p, kind){
   if(p.kcd>0) return false;
   var ball=G.ball;
   if(dist(p, ball) > KICK_RANGE) return false;
-  var spd = (kind==='pass') ? PASS_SPD : SHOOT_SPD;
+  var spd = (kind==='shoot' || kind==='cshoot') ? SHOOT_SPD : PASS_SPD;
   spd *= (p.fShot||1) * G_SHOT;
   applyKickImpulse(p, spd);
-  if(kind==='shoot'){ ball.cw = p.id; ball.ct = 1100; ball.cd = null; ball.spin = 0; }
-  else { ball.cw = null; ball.ct = 0; ball.cd = null; }
+  if(kind==='cpass' || kind==='cshoot'){        // falso yalnizca falsolu tuslarda
+    ball.cw = p.id; ball.ct = 620; ball.cd = null; ball.spin = 0;
+  } else {                                       // normal pas/sut: falso YOK
+    ball.cw = null; ball.ct = 0; ball.cd = null; ball.spin = 0;
+  }
   G.ko = false;
   p.flash = 160;
   p.kcd = 220;
@@ -989,11 +1119,10 @@ function botThink(){
     for(var hi=0; hi<team.length; hi++){
       if(!team[hi].bot && dist(team[hi], ball) < KICK_RANGE + 14){ humanHolder = team[hi]; break; }
     }
-    // takim komutlari: C = bosa kac, V = baski yap
-    var runOrder = false, pressOrder = false;
+    // takim komutu: V = baski yap
+    var pressOrder = false;
     for(var ro=0; ro<team.length; ro++){
       if(team[ro].bot) continue;
-      if(team[ro].runReq > 0) runOrder = true;
       if(team[ro].pressReq > 0) pressOrder = true;
     }
     // insan komutu: X = bana pas, Space = kaleye sut
@@ -1002,6 +1131,9 @@ function botThink(){
       var hp = team[ci2];
       if(hp.bot) continue;
       if(hp.passReq > 0){ cmdPlayer = hp; cmdType = 'pass'; break; }
+      if(hp.cpassReq > 0){ cmdPlayer = hp; cmdType = 'cpass'; break; }
+      if(hp.cshootReq > 0){ cmdPlayer = hp; cmdType = 'cshoot'; break; }
+      if(hp.thruReq > 0){ cmdPlayer = hp; cmdType = 'through'; break; }
       if(hp.shootReq > 0){ cmdPlayer = hp; cmdType = 'shoot'; break; }
     }
     var chaser=null, bd=1e9;
@@ -1050,7 +1182,7 @@ function botThink(){
         var pbK = penBox(t);
         kx = Math.max(pbK.x0+6, Math.min(pbK.x1-6, kx));
         kyy = Math.max(pbK.y0+6, Math.min(pbK.y1-6, kyy));
-        var kSprint = Dk.sprint && vl0 < PEN_W*1.5 && p.stamina > Dk.stamMin*0.4 && !p.lock;
+        var kSprint = Dk.sprint && vl0 < PEN_W*1.5 && p.stamina > Dk.stamMin*0.25 && !p.lock;
         moveBot(p, kx, kyy, kSprint);
         slot++;
         continue;
@@ -1062,24 +1194,39 @@ function botThink(){
         var req = (cmdPlayer && cmdPlayer!==p) ? cmdPlayer : null;
         if(p===keeper){
           var kax = t===0 ? W*0.72 : W*0.28, kay = PY0 + rnd(0.25,0.75)*(PY1-PY0);
-          if(req && cmdType==='pass'){ kax=req.x; kay=req.y; }
-          else if(req && cmdType==='shoot'){ kax=gx; kay=gy; }
+          if(req && (cmdType==='pass'||cmdType==='through'||cmdType==='cpass')){ kax=req.x; kay=req.y; }
+          else if(req && (cmdType==='shoot'||cmdType==='cshoot')){ kax=gx; kay=gy; }
           if(!botKick(p, kax, kay, req?PASS_SPD:SHOOT_SPD, -1)){    // kaleci her yonden temizler
             moveBot(p, lineupSpot(kax,kay).x, lineupSpot(kax,kay).y, false);
-          } else if(req){ req.passReq=0; req.shootReq=0; }
+          } else if(req){ req.passReq=0; req.shootReq=0; req.thruReq=0; req.cpassReq=0; req.cshootReq=0; }
           slot++;
           continue;
         }
         if(req){
           // insan emri: X -> bana pas, Space -> kaleye sut. Hizali degilse topun arkasina gec.
           var tax, tay, tspd;
-          if(cmdType==='shoot'){ tax=gx; tay=gy + rnd(-GOAL_H*0.25, GOAL_H*0.25); tspd=SHOOT_SPD; }
+          if(cmdType==='shoot' || cmdType==='cshoot'){
+            tax=gx; tay=gy + rnd(-GOAL_H*0.25, GOAL_H*0.25); tspd=SHOOT_SPD;
+            if(cmdType==='cshoot') p.throughKick = true;      // falsolu sut emri
+          }
+          else if(cmdType==='cpass'){ tax=req.x; tay=req.y; tspd=PASS_SPD; p.throughKick = true; }
+          else if(cmdType==='through'){
+            // ARA PAS: oyuncunun ONUNE, bosluga at (kosarak yetissin) - falso serbest
+            var lead = 150 + (t===0 ? 1 : -1) * 0;
+            tax = req.x + (t===0 ? lead : -lead);
+            tay = req.y + (req.vy||0) * 22;
+            tax = Math.max(PX0+25, Math.min(PX1-25, tax));
+            tay = Math.max(PY0+25, Math.min(PY1-25, tay));
+            tspd = (PASS_SPD + SHOOT_SPD) * 0.5;
+            p.throughKick = true;
+          }
           else { tax=req.x; tay=req.y; tspd=PASS_SPD; }
-          if(botKick(p, tax, tay, tspd, 0.28)){ req.passReq=0; req.shootReq=0; }
+          if(botKick(p, tax, tay, tspd, 0.28)){ req.passReq=0; req.shootReq=0; req.thruReq=0; req.cpassReq=0; req.cshootReq=0; }
           else {
+            p.throughKick = false;
             var ls=lineupSpot(tax, tay);
             var w3=avoidBallPath(p, ls.x, ls.y);
-            var rSprint = D.sprint && p.stamina>D.stamMin*0.6 && !p.lock;
+            var rSprint = D.sprint && p.stamina>D.stamMin*0.35 && !p.lock;
             moveBot(p, w3.x, w3.y, rSprint);
           }
         } else if(Math.abs(p.x-gx) < D.shootRange + BOT_STYLE[t]*40 &&
@@ -1091,7 +1238,7 @@ function botThink(){
           if(!botKick(p, gx, aimY, SHOOT_SPD, minD)){
             var ls2=lineupSpot(gx, aimY);
             var w2=avoidBallPath(p, ls2.x, ls2.y);
-            var lSprint = D.sprint && p.stamina>D.stamMin && !p.lock;
+            var lSprint = D.sprint && p.stamina>D.stamMin*0.5 && !p.lock;
             moveBot(p, w2.x, w2.y, lSprint);
           }
         } else if(bestPassMate(p, t)){
@@ -1100,11 +1247,11 @@ function botThink(){
           if(!botKick(p, pm.x, pm.y, PASS_SPD, 0.30)){
             var ls3 = lineupSpot(pm.x, pm.y);
             var w4 = avoidBallPath(p, ls3.x, ls3.y);
-            moveBot(p, w4.x, w4.y, D.sprint && p.stamina>D.stamMin && !p.lock);
+            moveBot(p, w4.x, w4.y, D.sprint && p.stamina>D.stamMin*0.5 && !p.lock);
           }
         } else {
           // top sür: rakip kaleye doğru, stamina varsa sprintle (gol odakli)
-          var drSprint = D.sprint && p.stamina > D.stamMin && !p.lock;
+          var drSprint = D.sprint && p.stamina > D.stamMin*0.5 && !p.lock;
           moveBot(p, gx, gy, drSprint);
         }
       } else if(p===chaser){
@@ -1116,9 +1263,10 @@ function botThink(){
         var aimTX = gx2, aimTY = gy2, obeying = false;
         if(cmdPlayer && cmdPlayer!==p){
           obeying = true;
-          if(cmdType==='pass'){ aimTX = cmdPlayer.x; aimTY = cmdPlayer.y; }
+          if(cmdType==='pass' || cmdType==='cpass'){ aimTX = cmdPlayer.x; aimTY = cmdPlayer.y; }
+          else if(cmdType==='through'){ aimTX = cmdPlayer.x + (t===0?150:-150); aimTY = cmdPlayer.y; }
         }
-        var inFinal = (!obeying || cmdType==='shoot') && (t===0 ? (ball.x > W*0.52) : (ball.x < W*0.48));
+        var inFinal = (!obeying || cmdType==='shoot' || cmdType==='cshoot') && (t===0 ? (ball.x > W*0.52) : (ball.x < W*0.48));
         var shotTaken = false;
         if(inFinal){
           // kaleciden uzak koseyi hedefle
@@ -1133,7 +1281,7 @@ function botThink(){
           shotTaken = botKick(p, gx2, aimY2, SHOOT_SPD, md);
         }
         if(!shotTaken){
-          var sprint = Dc.sprint && dist(p,ball) > Dc.sprintDist && p.stamina > Dc.stamMin*0.5 && !p.lock;
+          var sprint = Dc.sprint && dist(p,ball) > Dc.sprintDist*0.55 && p.stamina > Dc.stamMin*0.3 && !p.lock;
           // topa dogru taraftan yaklas: arkasina gec ki temas topu ILERI itsin
           var cxv = ball.x-p.x, cyv = ball.y-p.y, cl2 = Math.sqrt(cxv*cxv+cyv*cyv)||1;
           var gxv = aimTX-ball.x, gyv = aimTY-ball.y, gl2 = Math.sqrt(gxv*gxv+gyv*gyv)||1;
@@ -1151,7 +1299,7 @@ function botThink(){
       } else if(pressOrder && !humanHolder){
         // V emri: topa baski yap
         var Dp = DIFFS[BOT_DIFF];
-        var pSprint = Dp.sprint && p.stamina > Dp.stamMin*0.4 && !p.lock;
+        var pSprint = Dp.sprint && p.stamina > Dp.stamMin*0.25 && !p.lock;
         moveBot(p, ball.x, ball.y, pSprint);
       } else {
         // dizil: topun konumuna göre kaydırılmış formasyon
@@ -1184,28 +1332,6 @@ function botThink(){
           } else if(p.role==='mid'){
             tx = ball.x + fwdDir*95;  ty = ball.y + lane*150;
           }
-          if(runOrder && p.role!=='def'){
-            // C emri: derinlemesine bosa kac - rakiplerden uzak, ileri bir nokta sec
-            var bestX=tx, bestY=ty, bestScore=-1e9;
-            for(var ang=0; ang<8; ang++){
-              var aa = (Math.PI*2/8)*ang;
-              var cxg = ball.x + fwdDir*Math.abs(Math.cos(aa))*300 + Math.cos(aa)*40;
-              var cyg = ball.y + Math.sin(aa)*230;
-              cxg = Math.max(PX0+40, Math.min(PX1-40, cxg));
-              cyg = Math.max(PY0+30, Math.min(PY1-30, cyg));
-              // rakiplerden uzaklik + ileri olma puani
-              var sc2 = 0, near=1e9;
-              for(var oq=0; oq<G.players.length; oq++){
-                var qq=G.players[oq];
-                if(qq.team===t) continue;
-                var dd2=Math.hypot(cxg-qq.x, cyg-qq.y);
-                if(dd2<near) near=dd2;
-              }
-              sc2 = near*1.4 + (t===0 ? cxg : (W-cxg))*0.6 - Math.hypot(cxg-p.x, cyg-p.y)*0.35;
-              if(sc2>bestScore){ bestScore=sc2; bestX=cxg; bestY=cyg; }
-            }
-            tx=bestX; ty=bestY;
-          }
           // topa cok yaklasip insanin ayagindaki topa mudahale etmesin
           var dxh = tx - ball.x, dyh = ty - ball.y, dh = Math.sqrt(dxh*dxh+dyh*dyh);
           if(dh < 110){ var s0 = 110/(dh||1); tx = ball.x + dxh*s0; ty = ball.y + dyh*s0; }
@@ -1220,9 +1346,8 @@ function botThink(){
             if(closerCount<=1){ tx=ball.x; ty=ball.y; }
           }
         }
-        var runFast = runOrder && humanHolder && p.role!=='def';
-        var fSprint = DIFFS[BOT_DIFF].sprint && p.stamina>DIFFS[BOT_DIFF].stamMin+10 && !p.lock &&
-                      (runFast || Math.hypot(tx-p.x,ty-p.y)>120);
+        var fSprint = DIFFS[BOT_DIFF].sprint && p.stamina>DIFFS[BOT_DIFF].stamMin*0.6 && !p.lock &&
+                      Math.hypot(tx-p.x,ty-p.y)>70;
         moveBot(p, tx, ty, fSprint);
       }
       slot++;
@@ -1256,7 +1381,8 @@ function botKick(p, ax, ay, spd, minDot){
   var bl0 = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy) || 1;
   var mx = ball.vx/bl0, my = ball.vy/bl0;
   // sert vuruslarda falso: topu hedefe dogru bukecek dik bileseni sakla
-  if(spd >= SHOOT_SPD && BOT_DIFF >= 1){
+  if(p.throughKick){          // sadece "ara pas" emrinde falso kullanilir
+    p.throughKick = false;
     var pdot = dx*mx + dy*my;
     var px2 = dx - pdot*mx, py2 = dy - pdot*my;
     var pl2 = Math.sqrt(px2*px2 + py2*py2);
@@ -1405,7 +1531,7 @@ function hostOnData(conn, msg){
       conn.send({t:'start', fs:fieldSize, mg:maxGoals});
       pushLobby();
     } else {
-      LOBBY.roster.push({ id:conn.peer, name:nm, team:2, pos:'mid', bot:false, stats:cleanStats(msg.st) });
+      LOBBY.roster.push({ id:conn.peer, name:nm, team:2, pos:'mid', bot:false, stats:cleanStats(msg.st), kit:cleanKit(msg.kit) });
       pushLobby(); renderLobby();
       lchat('', 0, nm + ' odaya katıldı', true);
       lchatBroadcast('', 0, nm + ' odaya katıldı', true);
@@ -1415,6 +1541,10 @@ function hostOnData(conn, msg){
     if(s){
       if(msg.a==='team' && (msg.team===0||msg.team===1||msg.team===2)){ s.team=msg.team; rosterChanged(); }
       else if(msg.a==='pos' && (msg.pos==='gk'||msg.pos==='fld')){ s.pos=msg.pos; rosterChanged(); }
+      else if(msg.a==='kit'){
+        s.kit = cleanKit(msg.kit);
+        applyKitLive(conn.peer, s.kit);
+      }
       else if(msg.a==='stats'){
         if(!LOBBY.started){                // mac sürerken degisim kabul edilmez
           s.stats = cleanStats(msg.stats);
@@ -1489,7 +1619,8 @@ function broadcast(){
   var st = { t:'st',
     p: G.players.map(function(p){ return { i:p.id, n:p.name, t:p.team, b:p.bot?1:0,
         x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0,
-        fl:(p.flash>0 || p.glow)?1:0, kp:(p.keeper&&p.bot)?1:0, sr:p.spr?1:0 }; }),
+        fl:(p.flash>0 || p.glow)?1:0, kp:(p.keeper&&p.bot)?1:0, sr:p.spr?1:0,
+        kn:(p.kit&&p.kit.num)||0, kc:(p.kit&&p.kit.color)||'' }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
     s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF,BOT_STYLE[0],BOT_STYLE[1],G_SPRINT,G_CURVE,G_SHOT,BALL_MASS],
     ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam, ck: Math.round(G.clock), mm: matchMins };
@@ -1506,7 +1637,7 @@ function startClient(code, attempt){
     hostConn = peer.connect('ballclub-' + code.toUpperCase(), {reliable:true});
     var ok=false;
     hostConn.on('open', function(){
-      hostConn.send({t:'hi', n:myName, st:cleanStats(myStats)});
+      hostConn.send({t:'hi', n:myName, st:cleanStats(myStats), kit:cleanKit(myKit)});
     });
     hostConn.on('data', function(msg){
       if(msg.t==='wel'){ ok=true; myPid=msg.pid; roomCode=code.toUpperCase(); showLobby(); }
@@ -1578,7 +1709,7 @@ function loop(now){
         for(var j=0;j<Gr.p.length;j++) if(Gr.p[j].i===tp.i){ rp=Gr.p[j]; break; }
         if(!rp){ Gr.p.push(JSON.parse(JSON.stringify(tp))); continue; }
         rp.x += (tp.x-rp.x)*t; rp.y += (tp.y-rp.y)*t;
-        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fl=tp.fl; rp.kp=tp.kp; rp.sr=tp.sr;
+        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fl=tp.fl; rp.kp=tp.kp; rp.sr=tp.sr; rp.kn=tp.kn; rp.kc=tp.kc;
       }
       Gr.p = Gr.p.filter(function(rp){ return G.p.some(function(tp){return tp.i===rp.i;}); });
       Gr.b[0] += (G.b[0]-Gr.b[0])*t; Gr.b[1] += (G.b[1]-Gr.b[1])*t;
@@ -1590,9 +1721,15 @@ function loop(now){
 }
 
 function hostView(){
-  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0,kp:(p.keeper&&p.bot)?1:0,sr:p.spr?1:0};}),
+  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0,kp:(p.keeper&&p.bot)?1:0,sr:p.spr?1:0,kn:(p.kit&&p.kit.num)||0,kc:(p.kit&&p.kit.color)||''};}),
            b:[G.ball.x,G.ball.y], s:G.score, ph:G.phase, m:G.msg, pa:G.paused?1:0,
            ko:(G.ko && G.phase==='play')?1:0, kt:G.koTeam, ck:Math.round(G.clock), mm:matchMins };
+}
+
+function kitLum(hex){
+  if(!hex || hex.charAt(0)!=='#' || hex.length<7) return 0;
+  var r=parseInt(hex.substr(1,2),16)/255, g=parseInt(hex.substr(3,2),16)/255, b=parseInt(hex.substr(5,2),16)/255;
+  return 0.299*r + 0.587*g + 0.114*b;
 }
 
 function fmtTime(ms){
@@ -1643,10 +1780,25 @@ function render(v){
       ctx.beginPath(); ctx.arc(p.x,p.y,KICK_RANGE,0,Math.PI*2); ctx.stroke();
       ctx.setLineDash([]);
     }
-    ctx.fillStyle = p.t===0 ? '#E56E56' : '#5689E5';
+    var teamCol = p.t===0 ? '#E56E56' : '#5689E5';
+    var kitCol = p.kc || teamCol;
+    ctx.fillStyle = kitCol;
+    ctx.beginPath(); ctx.arc(p.x,p.y,PR,0,Math.PI*2); ctx.fill();
+    // takim rengi kalin halka (forma rengi ne olursa olsun takim belli olsun)
+    ctx.strokeStyle = teamCol; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(p.x,p.y,PR-2,0,Math.PI*2); ctx.stroke();
     ctx.strokeStyle = flash ? '#FFFFFF' : '#1B2125';
     ctx.lineWidth = flash ? 3.5 : 2;
-    ctx.beginPath(); ctx.arc(p.x,p.y,PR,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(p.x,p.y,PR,0,Math.PI*2); ctx.stroke();
+    // forma numarasi
+    if(p.kn){
+      var lum = kitLum(kitCol);
+      ctx.fillStyle = lum > 0.6 ? '#1B2125' : '#FFFFFF';
+      ctx.font = 'bold 12px Segoe UI, Arial';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(String(p.kn), p.x, p.y+0.5);
+      ctx.textBaseline='alphabetic';
+    }
     ctx.fillStyle = me ? '#FFFFFF' : 'rgba(255,255,255,0.85)';
     ctx.font = (me?'bold ':'')+'11px Segoe UI, Arial';
     ctx.textAlign='center';
@@ -1719,6 +1871,39 @@ function drawGoal(x, dir){
 
 /* ================= KARAKTER STATLARI ================= */
 var myStats = loadStats();
+
+/* Forma: numara + renk. Renk oyuncunun ic dolgusu olur,
+   takim rengi kalin cerceve olarak kalir (takimlar karismaz). */
+var KIT_COLORS = ['#E56E56','#5689E5','#E5B356','#5FBF6B','#B06FD8','#3FC3C9','#EDEDED','#2E3439'];
+var KKEY = 'bc2d_kit';
+function loadKit(){
+  try {
+    var s = localStorage.getItem(KKEY);
+    if(s){ var o = JSON.parse(s); return cleanKit(o); }
+  } catch(e){}
+  return { num: 10, color: null };
+}
+function cleanKit(o){
+  var n = (o && typeof o.num==='number') ? Math.round(o.num) : 10;
+  n = Math.max(1, Math.min(99, n));
+  var c = (o && typeof o.color==='string' && KIT_COLORS.indexOf(o.color)>=0) ? o.color : null;
+  return { num:n, color:c };
+}
+function saveKit(){ try { localStorage.setItem(KKEY, JSON.stringify(myKit)); } catch(e){} }
+var myKit = loadKit();
+
+function pushMyKit(){
+  if(role==='host'){
+    var s = LOBBY.roster && LOBBY.roster.find(function(x){return x.id===myPid;});
+    if(s){ s.kit = cleanKit(myKit); applyKitLive(myPid, s.kit); pushLobby(); renderLobby(); }
+  } else if(hostConn && hostConn.open){
+    hostConn.send({t:'lreq', a:'kit', kit:cleanKit(myKit)});
+  }
+}
+function applyKitLive(id, kit){
+  if(!G || !G.players) return;
+  for(var i=0;i<G.players.length;i++) if(G.players[i].id===id){ G.players[i].kit = kit; break; }
+}
 
 /* ============ PAYLASILAN AYAR DOSYASI (config.json) ============
    Ayarlari JSON olarak disari aktarip repoya config.json adiyla koyarsan,
@@ -1833,6 +2018,7 @@ function applyCfgObject(o){
   LOBBY.cfg.gShot   = clampN(o.gShot, 0.6, 1.8, 1);
   LOBBY.cfg.bMass   = clampN(o.bMass, 0.5, 3, 1.45);
   if(o.diff != null) LOBBY.cfg.diff = Math.max(0, Math.min(4, Math.round(o.diff)));
+  if(o.botStats){ BOT_STATS = cleanBotStatsTable(o.botStats); saveBotStats(); if(typeof renderBotStatRows==='function') renderBotStatRows(); refreshBotsLive(); }
   applyCfgLocal();
 }
 
@@ -1873,7 +2059,8 @@ function exportGameCfg(){
     updated: Date.now(),
     spdP: LOBBY.cfg.spdP, spdB: LOBBY.cfg.spdB,
     gSprint: LOBBY.cfg.gSprint, gCurve: LOBBY.cfg.gCurve, gShot: LOBBY.cfg.gShot,
-    bMass: LOBBY.cfg.bMass, diff: LOBBY.cfg.diff
+    bMass: LOBBY.cfg.bMass, diff: LOBBY.cfg.diff,
+    botStats: BOT_STATS
   };
   var txt = JSON.stringify(o, null, 2);
   try {
@@ -1961,6 +2148,85 @@ function pushMyStats(){
   }
 }
 
+
+/* ================= BOT STAT AYARLARI ================= */
+function renderBotStatRows(){
+  var host = el('bsRows'); if(!host) return;
+  var lvl = parseInt(el('bsLvl').value,10);
+  if(isNaN(lvl)) lvl = 2;
+  lvl = Math.max(0, Math.min(4, lvl));
+  var pos = el('bsPos').value;
+  if(POS_KEYS.indexOf(pos) < 0) pos = 'mid';
+  if(!BOT_STATS[lvl]) BOT_STATS = defaultBotStats();
+  var st = BOT_STATS[lvl][pos];
+  host.innerHTML = '';
+  STAT_KEYS.forEach(function(k){
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:6px;margin:3px 0';
+    var lab = document.createElement('span');
+    lab.style.cssText = 'flex:1;font-size:11px;color:#9FB3BB';
+    lab.textContent = STAT_LABELS[k];
+    var minus = document.createElement('button');
+    minus.textContent='−'; minus.style.cssText='width:22px;padding:2px 0;font-size:12px';
+    minus.disabled = st[k] <= 1;
+    minus.onclick = function(){ if(st[k]>1){ st[k]--; saveBotStats(); renderBotStatRows(); refreshBotsLive(); } };
+    var val = document.createElement('span');
+    val.style.cssText='width:16px;text-align:center;font-size:12px;color:#E5B356;font-weight:700';
+    val.textContent = st[k];
+    var plus = document.createElement('button');
+    plus.textContent='+'; plus.style.cssText='width:22px;padding:2px 0;font-size:12px';
+    plus.disabled = st[k] >= 7;
+    plus.onclick = function(){ if(st[k]<7){ st[k]++; saveBotStats(); renderBotStatRows(); refreshBotsLive(); } };
+    row.appendChild(lab); row.appendChild(minus); row.appendChild(val); row.appendChild(plus);
+    host.appendChild(row);
+  });
+}
+function saveBotStats(){
+  try { localStorage.setItem('bc2d_botstats', JSON.stringify(BOT_STATS)); } catch(e){}
+}
+function loadBotStats(){
+  try {
+    var s = localStorage.getItem('bc2d_botstats');
+    if(s) return cleanBotStatsTable(JSON.parse(s));
+  } catch(e){}
+  return defaultBotStats();
+}
+// sahadaki botlara aninda uygula
+function refreshBotsLive(){
+  if(role!=='host' || !G || !G.players) return;
+  for(var i=0;i<G.players.length;i++){
+    var p = G.players[i];
+    if(p.bot) applyStats(p, botStatsFor(BOT_DIFF, p.role), true);
+  }
+}
+
+/* ================= FORMA ARAYÜZÜ ================= */
+function renderKitUI(){
+  buildKitUI('kitNum', 'kitColors');
+  buildKitUI('lkitNum', 'lkitColors');
+}
+function buildKitUI(numId, colId){
+  var ni = el(numId), cc = el(colId);
+  if(ni){ ni.value = myKit.num; }
+  if(!cc) return;
+  cc.innerHTML = '';
+  KIT_COLORS.forEach(function(col){
+    var b = document.createElement('button');
+    b.className = 'kitSw' + ((myKit.color===col) ? ' sel' : '');
+    b.style.background = col;
+    b.title = 'Forma rengi';
+    b.onclick = function(){ myKit.color = col; saveKit(); renderKitUI(); pushMyKit(); };
+    cc.appendChild(b);
+  });
+  var d = document.createElement('button');
+  d.className = 'kitSw' + (myKit.color===null ? ' sel' : '');
+  d.style.background = 'transparent';
+  d.textContent = '×';
+  d.style.color = '#9FB3BB'; d.style.fontSize = '12px'; d.style.lineHeight = '1';
+  d.title = 'Takım rengi (varsayılan)';
+  d.onclick = function(){ myKit.color = null; saveKit(); renderKitUI(); pushMyKit(); };
+  cc.appendChild(d);
+}
 
 /* ================= LOBİ ================= */
 function showMenu(){ el('menu').style.display='block'; el('lobby').style.display='none'; el('gameWrap').style.display='none'; }
@@ -2065,6 +2331,7 @@ function renderLobby(){
   el('lgoalSel').disabled = LOBBY.started;
   el('lminSel').disabled = LOBBY.started;
   renderStatRows();
+  renderKitUI();
   var lsr = el('lstatReset'); if(lsr) lsr.disabled = statsLocked();
   // mevki secici benim slotuma gore
   var ms = mySlot();
@@ -2251,8 +2518,8 @@ function sendChat(){
 el('chatSend').onclick = sendChat;
 
 /* ================= GİRİŞ ================= */
-var DEF_BINDS = { u:'KeyW', d:'KeyS', l:'KeyA', r:'KeyD', s:'ShiftLeft', pass:'KeyX', shoot:'Space', run:'KeyC', press:'KeyV' };
-var BIND_LABELS = { u:'Yukarı', d:'Aşağı', l:'Sol', r:'Sağ', s:'Sprint', pass:'Pas', shoot:'Şut', run:'Boşa Kaç (takım)', press:'Baskı Yap (takım)' };
+var DEF_BINDS = { u:'KeyW', d:'KeyS', l:'KeyA', r:'KeyD', s:'ShiftLeft', pass:'KeyX', shoot:'Space', cpass:'KeyZ', cshoot:'KeyC', through:'AltLeft', press:'KeyV' };
+var BIND_LABELS = { u:'Yukarı', d:'Aşağı', l:'Sol', r:'Sağ', s:'Sprint', pass:'Pas', shoot:'Şut', cpass:'Falsolu Pas', cshoot:'Falsolu Şut', through:'Ara Pas', press:'Baskı Yap (takım)' };
 var binds = loadBinds();
 var listenAction = null; // su an tus bekleyen eylem
 
@@ -2265,9 +2532,10 @@ function loadBinds(){
 }
 function saveBinds(){ try{ localStorage.setItem('bc2d_binds', JSON.stringify(binds)); }catch(e){} }
 
-function normCode(c){ return (c==='ShiftRight') ? 'ShiftLeft' : c; }
+function normCode(c){ if(c==='ShiftRight') return 'ShiftLeft'; if(c==='AltRight') return 'AltLeft'; return c; }
 function keyLabel(c){
   if(c==='ShiftLeft') return 'Shift';
+  if(c==='AltLeft') return 'Alt';
   if(c==='Space') return 'Space';
   if(c.indexOf('Key')===0) return c.slice(3);
   if(c.indexOf('Digit')===0) return c.slice(5);
@@ -2312,7 +2580,9 @@ function keySet(e, down){
   if(c===binds.s){ keys.s=down; hit=true; }
   if(c===binds.pass){ keys.x=down; if(down && !e.repeat) sendEvent('pass'); hit=true; }
   if(c===binds.shoot){ keys.sp=down; if(down && !e.repeat) sendEvent('shoot'); hit=true; }
-  if(c===binds.run){ if(down && !e.repeat) sendEvent('run'); hit=true; }
+  if(c===binds.cpass){ keys.x=down; if(down && !e.repeat) sendEvent('cpass'); hit=true; }
+  if(c===binds.cshoot){ keys.sp=down; if(down && !e.repeat) sendEvent('cshoot'); hit=true; }
+  if(c===binds.through){ if(down && !e.repeat) sendEvent('through'); hit=true; }
   if(c===binds.press){ if(down && !e.repeat) sendEvent('press'); hit=true; }
   // yon oklari: baska bir eyleme atanmadiysa her zaman hareket
   if(!hit){
@@ -2321,6 +2591,7 @@ function keySet(e, down){
     else if(c==='ArrowLeft'){ keys.l=down; hit=true; }
     else if(c==='ArrowRight'){ keys.r=down; hit=true; }
   }
+  if((c==='AltLeft'||c==='AltRight') && running) e.preventDefault();
   if(hit && running) e.preventDefault();
   if(hit) pushKeys();
 }
@@ -2375,7 +2646,7 @@ function readMenu(){
 }
 
 function initLobbyHost(){
-  LOBBY.roster = [{ id:'host', name:myName, team:0, pos:'mid', bot:false, stats:cleanStats(myStats) }];
+  LOBBY.roster = [{ id:'host', name:myName, team:0, pos:'mid', bot:false, stats:cleanStats(myStats), kit:cleanKit(myKit) }];
   var gc0 = loadGameCfg();   // daha once kaydettigim ayarlar her yeni odada gecerli
   LOBBY.cfg = { field:'big', goals:3, style0:1, style1:1, mins:0, cap0:null, cap1:null,
                 spdP:gc0.spdP, spdB:gc0.spdB, gSprint:gc0.gSprint, gCurve:gc0.gCurve,
@@ -2585,6 +2856,24 @@ el('ggcInp').oninput = applyLive;
 el('ggkInp').oninput = applyLive;
 el('gbmInp').oninput = applyLive;
 el('cfgExportBtn').onclick = exportGameCfg;
+
+function bindKitNum(id){
+  var e0 = el(id); if(!e0) return;
+  e0.onchange = function(){
+    var v = parseInt(this.value,10);
+    if(isNaN(v)) v = 10;
+    myKit.num = Math.max(1, Math.min(99, v));
+    this.value = myKit.num;
+    saveKit(); renderKitUI(); pushMyKit();
+  };
+}
+bindKitNum('kitNum'); bindKitNum('lkitNum');
+renderKitUI();
+
+BOT_STATS = loadBotStats();
+el('bsLvl').onchange = renderBotStatRows;
+el('bsPos').onchange = renderBotStatRows;
+renderBotStatRows();
 
 el('cfgExport').onclick = downloadCfgJson;
 el('cfgImport').onclick = function(){ el('cfgFile').click(); };
