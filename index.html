@@ -14,6 +14,20 @@
           padding:28px 34px; width:380px; }
   #menu h1 { font-size:26px; letter-spacing:1px; margin-bottom:0; color:#CDE6B4; }
   .brand { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  #statBox { margin-top:16px; padding:10px 12px 12px; background:#1F272C; border:1px solid #3C4A52; border-radius:6px; }
+  #statBox .sttop { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
+  #statBox .settitle { font-size:11px; letter-spacing:2px; color:#CDE6B4; }
+  #statLeft { font-size:11px; color:#E5B356; font-weight:700; }
+  .statRow { display:flex; align-items:center; gap:8px; margin:5px 0; }
+  .statRow .sname { flex:0 0 120px; font-size:12px; color:#9FB3BB; }
+  .statRow .sbar { flex:1; height:9px; background:#151B1E; border:1px solid #3C4A52; border-radius:4px; overflow:hidden; display:flex; gap:1px; padding:1px; }
+  .statRow .seg { flex:1; background:#2C363B; border-radius:1px; }
+  .statRow .seg.on { background:#5B8C3E; }
+  .statRow .seg.hi { background:#CDE6B4; }
+  .statRow .sval { flex:0 0 14px; text-align:center; font-size:12px; font-weight:700; color:#E8E8E8; }
+  .statRow button { flex:0 0 auto; width:24px; padding:3px 0; font-size:13px; line-height:1; background:#3C4A52; }
+  .statRow button:disabled { background:#252E33; color:#5A686F; cursor:default; }
+  #statReset { width:100%; margin-top:8px; padding:6px 0; font-size:11px; background:#3C4A52; }
   .brand .logo { flex:0 0 auto; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35)); }
   #menu .sub { font-size:12px; color:#8FA0A8; margin-bottom:20px; }
   #menu label { display:block; font-size:12px; color:#9FB3BB; margin:12px 0 4px; }
@@ -152,6 +166,11 @@
   <div class="sub">Botlu 2D futbol · WASD/Yön hareket · X pas · Space şut · Shift sprint</div>
   <label>Takma adın</label>
   <input id="nameInp" maxlength="14" placeholder="Alperen">
+  <div id="statBox">
+    <div class="sttop"><span class="settitle">KARAKTER STATLARI</span><span id="statLeft"></span></div>
+    <div id="statRows"></div>
+    <button id="statReset">Standarda Dön (hepsi 3)</button>
+  </div>
   <div class="btnrow">
     <button class="primary" id="soloBtn">Tek Başına</button>
     <button class="primary" id="hostBtn">Oda Kur</button>
@@ -270,6 +289,12 @@
       <input type="range" id="gpInp" min="50" max="200" step="10" value="100">
       <label>Top hızı: <span id="gbVal">100%</span></label>
       <input type="range" id="gbInp" min="50" max="200" step="10" value="100">
+      <label>Sprint hızı (herkes): <span id="ggsVal">100%</span></label>
+      <input type="range" id="ggsInp" min="60" max="180" step="10" value="100">
+      <label>Plase / falso (herkes): <span id="ggcVal">100%</span></label>
+      <input type="range" id="ggcInp" min="0" max="250" step="10" value="100">
+      <label>Şut gücü (herkes): <span id="ggkVal">100%</span></label>
+      <input type="range" id="ggkInp" min="60" max="180" step="10" value="100">
       <label>Bot zorluğu</label>
       <select id="gdSel" style="width:100%;padding:7px 9px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:13px">
         <option value="0">Beginner</option>
@@ -307,7 +332,36 @@ var fieldSize = 'big';
 var GOAL_DEPTH = 34;
 var PR = 15, BR = 8, POST_R = 6;                    // yarıçaplar (POST_R: kale diregi)
 var KICK_RANGE = PR + BR + 6;
-var ACC = 0.30, PDAMP = 0.925, BASE_MAX = 2.55, SPRINT_MAX = 3.7;
+var ACC = 0.30, PDAMP = 0.925, BASE_MAX = 2.55, SPRINT_MAX = 4.25;
+// herkese uygulanan global carpanlar (host ayarlar, herkese yayilir)
+var G_SPRINT = 1, G_CURVE = 1, G_SHOT = 1;
+// karakter statlari: 5 stat, her biri 1-7, toplam 20 puan (standart 3)
+var DEF_STATS = { shot:3, curve:3, sprint:3, drib:3, power:3 };
+var STAT_KEYS = ['shot','curve','sprint','drib','power'];
+var STAT_LABELS = { shot:'Şut gücü', curve:'Plase / falso', sprint:'Sprint hızı', drib:'Dribbling hızı', power:'Güç (itme/direnç)' };
+var STAT_MIN = 1, STAT_MAX = 7, STAT_TOTAL = 20;
+function cleanStats(s){
+  var o = {}, sum = 0;
+  for(var i=0;i<STAT_KEYS.length;i++){
+    var k = STAT_KEYS[i];
+    var v = (s && typeof s[k]==='number') ? Math.round(s[k]) : DEF_STATS[k];
+    v = Math.max(STAT_MIN, Math.min(STAT_MAX, v));
+    o[k] = v; sum += v;
+  }
+  // toplam asilirsa standarda don (hile korumasi)
+  if(sum > STAT_TOTAL) return { shot:3, curve:3, sprint:3, drib:3, power:3 };
+  return o;
+}
+function statF(v, per){ return 1 + (v-3)*per; }
+function applyStats(p, s){
+  var st = cleanStats(s);
+  p.stats   = st;
+  p.fShot   = statF(st.shot,   0.075);   // 1 -> 0.85 | 7 -> 1.30
+  p.fCurve  = statF(st.curve,  0.15);    // 1 -> 0.70 | 7 -> 1.60
+  p.fSprint = statF(st.sprint, 0.055);   // 1 -> 0.89 | 7 -> 1.22
+  p.fDrib   = statF(st.drib,   0.055);
+  p.mass    = 1 + (st.power-3)*0.17;     // 1 -> 0.66 | 7 -> 1.68
+}
 var BDAMP = 0.992, BOUNCE = 0.82;
 var SHOOT_SPD = 9.5, PASS_SPD = 6.8;
 var STAM_MAX = 100, STAM_DRAIN = 38, STAM_REGEN = 17, STAM_UNLOCK = 25;
@@ -321,7 +375,7 @@ var ROLE_TR = { gk:'Kaleci', def:'Defans', mid:'Orta Saha', fwd:'Forvet' };
 var matchMins = 0;                                  // 0 = suresiz
 var PEN_W = 114, PEN_EXT = 45;                      // ceza sahasi: derinlik ve kale ustu/alti tasma
 var CIRCLE_R = 70;                                  // orta yuvarlak yaricapi
-var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, cap0:null, cap1:null }, started:false };
+var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, cap0:null, cap1:null }, started:false };
 var DIFF_NAMES = ['Beginner','Intermediate','Advanced','Expert','Master'];
 var DIFFS = [
   { spd:0.88, aimErr:0.46, shootRange:250, sprint:true, sprintDist:120, kcd:560, keepErr:30, press:0, stamMin:45, aimDot:0.10, keepOut:0.20 },
@@ -406,11 +460,14 @@ function penBox(t){
     : { x0:PX1-PEN_W, x1:PX1+4, y0:GY0-PEN_EXT, y1:GY1+PEN_EXT };
 }
 
-function newPlayer(id, name, team, bot){
-  return { id:id, name:name, team:team, bot:bot,
+function newPlayer(id, name, team, bot, stats){
+  var np = { id:id, name:name, team:team, bot:bot,
            x:0, y:0, vx:0, vy:0,
            stamina:STAM_MAX, lock:false, kcd:0, passReq:0, shootReq:0, runReq:0, pressReq:0, flash:0, keeper:false,
+           stats:null, fShot:1, fCurve:1, fSprint:1, fDrib:1, mass:1,
            in:{u:0,d:0,l:0,r:0,s:0}, ev:[] };
+  applyStats(np, stats);
+  return np;
 }
 
 function buildGameFromRoster(){
@@ -420,7 +477,7 @@ function buildGameFromRoster(){
         koTeam:0, ko:true, t:0, clock:0 };
   LOBBY.roster.forEach(function(s){
     if(s.team!==0 && s.team!==1) return;          // seyirci sahada degil
-    var p = newPlayer(s.id, s.name, s.team, !!s.bot);
+    var p = newPlayer(s.id, s.name, s.team, !!s.bot, s.bot ? null : s.stats);
     p.role = s.pos || 'mid';
     p.keeper = (p.role==='gk');
     G.players.push(p);
@@ -436,6 +493,9 @@ function applyCfgLocal(){
   matchMins = LOBBY.cfg.mins || 0;
   SPD_P = LOBBY.cfg.spdP || 1;
   SPD_B = LOBBY.cfg.spdB || 1;
+  G_SPRINT = (typeof LOBBY.cfg.gSprint==='number') ? LOBBY.cfg.gSprint : 1;
+  G_CURVE  = (typeof LOBBY.cfg.gCurve==='number')  ? LOBBY.cfg.gCurve  : 1;
+  G_SHOT   = (typeof LOBBY.cfg.gShot==='number')   ? LOBBY.cfg.gShot   : 1;
 }
 
 function resetPositions(){
@@ -612,11 +672,19 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
       p.stamina = Math.min(STAM_MAX, p.stamina + STAM_REGEN*dt*TICK_MS/1000);
       if(p.lock && p.stamina>=STAM_UNLOCK) p.lock=false;
     }
-    var maxv = (sprinting ? SPRINT_MAX : BASE_MAX) * SPD_P;
+    var maxv = (sprinting ? SPRINT_MAX*(p.fSprint||1)*G_SPRINT : BASE_MAX) * SPD_P;
+    // dribbling stati: top yakinken (surerken) hiz
+    if(Math.abs(G.ball.x-p.x) < KICK_RANGE+14 && Math.abs(G.ball.y-p.y) < KICK_RANGE+14){
+      maxv *= (p.fDrib||1);
+    }
     if(p.bot) maxv *= DIFFS[BOT_DIFF].spd;
 
     var accMul = p.bot ? DIFFS[BOT_DIFF].spd : 1;
-    p.vx += mx*ACC*SPD_P*accMul*dt; p.vy += my*ACC*SPD_P*accMul*dt;
+    // ivme, hedef maks hiza gore olceklenir; yoksa surtunme dengesi (3.70) tavani gizler
+    var accBase = ACC*SPD_P*accMul;
+    var natTerm = accBase*PDAMP/(1-PDAMP);
+    var accEff = (maxv > natTerm) ? accBase*(maxv/natTerm) : accBase;
+    p.vx += mx*accEff*dt; p.vy += my*accEff*dt;
     p.vx *= Math.pow(PDAMP, dt); p.vy *= Math.pow(PDAMP, dt);
     var sp = Math.sqrt(p.vx*p.vx+p.vy*p.vy);
     if(sp>maxv){ p.vx = p.vx/sp*maxv; p.vy = p.vy/sp*maxv; }
@@ -692,8 +760,14 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     var pa=G.players[a], pb=G.players[b];
     var dx=pb.x-pa.x, dy=pb.y-pa.y, d=Math.sqrt(dx*dx+dy*dy);
     if(d>0 && d<PR*2){
-      var ov=(PR*2-d)/2, nx=dx/d, ny=dy/d;
-      pa.x-=nx*ov; pa.y-=ny*ov; pb.x+=nx*ov; pb.y+=ny*ov;
+      var ovF=(PR*2-d), nx=dx/d, ny=dy/d;
+      var ma=pa.mass||1, mb=pb.mass||1, mt=ma+mb;
+      // agir (guclu) oyuncu az itilir, hafifi daha cok iter
+      pa.x-=nx*ovF*(mb/mt); pa.y-=ny*ovF*(mb/mt);
+      pb.x+=nx*ovF*(ma/mt); pb.y+=ny*ovF*(ma/mt);
+      var push=0.10;
+      pa.vx-=nx*push*(mb/mt); pa.vy-=ny*push*(mb/mt);
+      pb.vx+=nx*push*(ma/mt); pb.vy+=ny*push*(ma/mt);
     }
   }
 
@@ -716,7 +790,10 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
           var dot=cix*ux+ciy*uy;
           var perx=cix-dot*ux, pery=ciy-dot*uy;
           var pl=Math.sqrt(perx*perx+pery*pery);
-          if(pl>0.01){ ball.vx += perx/pl*0.085*dt; ball.vy += pery/pl*0.085*dt; }
+          if(pl>0.01){
+          var cf2 = 0.085 * (ow.fCurve||1) * G_CURVE;
+          ball.vx += perx/pl*cf2*dt; ball.vy += pery/pl*cf2*dt;
+        }
         }
       }
     }
@@ -821,6 +898,7 @@ function tryKick(p, kind){
   var ball=G.ball;
   if(dist(p, ball) > KICK_RANGE) return false;
   var spd = (kind==='pass') ? PASS_SPD : SHOOT_SPD;
+  spd *= (p.fShot||1) * G_SHOT;
   applyKickImpulse(p, spd);
   if(kind==='shoot'){ ball.cw = p.id; ball.ct = 850; ball.cd = null; }
   else { ball.cw = null; ball.ct = 0; ball.cd = null; }
@@ -1212,11 +1290,11 @@ function hostOnData(conn, msg){
         // oyuncu id bot idsiydi; guncelle
       }
       // basitlik: mac ortasinda katilan seyirci kalir, bir sonraki maca dahil
-      LOBBY.roster.push({ id:conn.peer, name:nm, team:2, pos:'mid', bot:false });
+      LOBBY.roster.push({ id:conn.peer, name:nm, team:2, pos:'mid', bot:false, stats:cleanStats(msg.st) });
       conn.send({t:'start', fs:fieldSize, mg:maxGoals});
       pushLobby();
     } else {
-      LOBBY.roster.push({ id:conn.peer, name:nm, team:2, pos:'mid', bot:false });
+      LOBBY.roster.push({ id:conn.peer, name:nm, team:2, pos:'mid', bot:false, stats:cleanStats(msg.st) });
       pushLobby(); renderLobby();
       lchat('', 0, nm + ' odaya katıldı', true);
       lchatBroadcast('', 0, nm + ' odaya katıldı', true);
@@ -1226,6 +1304,7 @@ function hostOnData(conn, msg){
     if(s){
       if(msg.a==='team' && (msg.team===0||msg.team===1||msg.team===2)){ s.team=msg.team; rosterChanged(); }
       else if(msg.a==='pos' && (msg.pos==='gk'||msg.pos==='fld')){ s.pos=msg.pos; rosterChanged(); }
+      else if(msg.a==='stats'){ s.stats = cleanStats(msg.stats); rosterChanged(); }
       else if(msg.a==='style' && (msg.team===0||msg.team===1) && captainOf(msg.team)===conn.peer){
         var st=Math.min(2,Math.max(0,Math.round(msg.style)));
         LOBBY.cfg['style'+msg.team]=st; if(LOBBY.started) BOT_STYLE[msg.team]=st;
@@ -1244,6 +1323,9 @@ function hostOnData(conn, msg){
       if(typeof msg.sp==='number') SPD_P = Math.min(2, Math.max(0.5, msg.sp));
       if(typeof msg.sb==='number') SPD_B = Math.min(2, Math.max(0.5, msg.sb));
       if(typeof msg.bd==='number'){ BOT_DIFF = Math.min(4, Math.max(0, Math.round(msg.bd))); LOBBY.cfg.diff=BOT_DIFF; }
+      if(typeof msg.gs==='number'){ G_SPRINT = Math.min(2, Math.max(0.5, msg.gs)); LOBBY.cfg.gSprint=G_SPRINT; }
+      if(typeof msg.gc==='number'){ G_CURVE  = Math.min(3, Math.max(0,   msg.gc)); LOBBY.cfg.gCurve=G_CURVE; }
+      if(typeof msg.gk2==='number'){ G_SHOT  = Math.min(2, Math.max(0.5, msg.gk2)); LOBBY.cfg.gShot=G_SHOT; }
       if(msg.tp) G.paused = !G.paused;
     }
   } else if(msg.t==='chat'){
@@ -1289,7 +1371,7 @@ function broadcast(){
         x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0,
         fl:(p.flash>0 || p.glow)?1:0, kp:(p.keeper&&p.bot)?1:0, sr:p.spr?1:0 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
-    s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF,BOT_STYLE[0],BOT_STYLE[1]],
+    s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF,BOT_STYLE[0],BOT_STYLE[1],G_SPRINT,G_CURVE,G_SHOT],
     ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam, ck: Math.round(G.clock), mm: matchMins };
   for(var k in conns){ try{ conns[k].send(st); }catch(e){} }
 }
@@ -1304,7 +1386,7 @@ function startClient(code, attempt){
     hostConn = peer.connect('ballclub-' + code.toUpperCase(), {reliable:true});
     var ok=false;
     hostConn.on('open', function(){
-      hostConn.send({t:'hi', n:myName});
+      hostConn.send({t:'hi', n:myName, st:cleanStats(myStats)});
     });
     hostConn.on('data', function(msg){
       if(msg.t==='wel'){ ok=true; myPid=msg.pid; roomCode=code.toUpperCase(); showLobby(); }
@@ -1316,7 +1398,9 @@ function startClient(code, attempt){
       else if(msg.t==='chatb'){ addChat(msg.n, msg.tm, msg.x, !!msg.sy); }
       else if(msg.t==='st'){
         G = msg;
-        if(msg.cf){ SPD_P=msg.cf[0]; SPD_B=msg.cf[1]; if(msg.cf.length>2) BOT_DIFF=msg.cf[2]; if(msg.cf.length>4){ BOT_STYLE=[msg.cf[3],msg.cf[4]]; } }
+        if(msg.cf){ SPD_P=msg.cf[0]; SPD_B=msg.cf[1]; if(msg.cf.length>2) BOT_DIFF=msg.cf[2];
+          if(msg.cf.length>4){ BOT_STYLE=[msg.cf[3],msg.cf[4]]; }
+          if(msg.cf.length>7){ G_SPRINT=msg.cf[5]; G_CURVE=msg.cf[6]; G_SHOT=msg.cf[7]; } }
         if(!Gr) Gr = JSON.parse(JSON.stringify(msg));
       }
     });
@@ -1510,6 +1594,54 @@ function drawGoal(x, dir){
   ctx.fillStyle='#FFFFFF'; ctx.strokeStyle='#1B2125'; ctx.lineWidth=1.5;
   ctx.beginPath(); ctx.arc(x,GY0,POST_R,0,Math.PI*2); ctx.fill(); ctx.stroke();
   ctx.beginPath(); ctx.arc(x,GY1,POST_R,0,Math.PI*2); ctx.fill(); ctx.stroke();
+}
+
+/* ================= KARAKTER STATLARI ================= */
+var myStats = loadStats();
+function loadStats(){
+  try {
+    var s = localStorage.getItem('bc2d_stats');
+    if(s) return cleanStats(JSON.parse(s));
+  } catch(e){}
+  return { shot:3, curve:3, sprint:3, drib:3, power:3 };
+}
+function saveStats(){ try{ localStorage.setItem('bc2d_stats', JSON.stringify(myStats)); }catch(e){} }
+function statsUsed(){ var n=0; for(var i=0;i<STAT_KEYS.length;i++) n += myStats[STAT_KEYS[i]]; return n; }
+
+function renderStatRows(){
+  var host = el('statRows'); if(!host) return;
+  host.innerHTML = '';
+  var used = statsUsed(), left = STAT_TOTAL - used;
+  el('statLeft').textContent = left + ' puan kaldı  (' + used + '/' + STAT_TOTAL + ')';
+  STAT_KEYS.forEach(function(k){
+    var row = document.createElement('div'); row.className='statRow';
+    var nm = document.createElement('span'); nm.className='sname'; nm.textContent = STAT_LABELS[k];
+    var minus = document.createElement('button'); minus.textContent='−';
+    minus.disabled = myStats[k] <= STAT_MIN;
+    minus.onclick = function(){ if(myStats[k]>STAT_MIN){ myStats[k]--; saveStats(); renderStatRows(); pushMyStats(); } };
+    var bar = document.createElement('div'); bar.className='sbar';
+    for(var i=1;i<=STAT_MAX;i++){
+      var sg=document.createElement('div');
+      sg.className='seg' + (i<=myStats[k] ? (i>3?' hi':' on') : '');
+      bar.appendChild(sg);
+    }
+    var val = document.createElement('span'); val.className='sval'; val.textContent=myStats[k];
+    var plus = document.createElement('button'); plus.textContent='+';
+    plus.disabled = (myStats[k] >= STAT_MAX) || (left <= 0);
+    plus.onclick = function(){ if(myStats[k]<STAT_MAX && (STAT_TOTAL-statsUsed())>0){ myStats[k]++; saveStats(); renderStatRows(); pushMyStats(); } };
+    row.appendChild(nm); row.appendChild(minus); row.appendChild(bar); row.appendChild(val); row.appendChild(plus);
+    host.appendChild(row);
+  });
+}
+
+// stat degisikligini odaya bildir
+function pushMyStats(){
+  if(role==='host'){
+    var s = LOBBY.roster && LOBBY.roster.find(function(x){return x.id===myPid;});
+    if(s){ s.stats = cleanStats(myStats); rosterChanged(); pushLobby(); }
+  } else if(hostConn && hostConn.open){
+    hostConn.send({t:'lreq', a:'stats', stats:cleanStats(myStats)});
+  }
 }
 
 /* ================= LOBİ ================= */
@@ -1919,11 +2051,17 @@ function readMenu(){
 }
 
 function initLobbyHost(){
-  LOBBY.roster = [{ id:'host', name:myName, team:0, pos:'mid', bot:false }];
-  LOBBY.cfg = { field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, cap0:null, cap1:null };
+  LOBBY.roster = [{ id:'host', name:myName, team:0, pos:'mid', bot:false, stats:cleanStats(myStats) }];
+  LOBBY.cfg = { field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, cap0:null, cap1:null };
   LOBBY.started = false;
   applyCfgLocal();
 }
+
+renderStatRows();
+el('statReset').onclick = function(){
+  myStats = { shot:3, curve:3, sprint:3, drib:3, power:3 };
+  saveStats(); renderStatRows(); pushMyStats();
+};
 
 el('soloBtn').onclick = function(){
   readMenu(); role='host'; myPid='host'; roomCode=null;
@@ -2018,6 +2156,10 @@ function syncPanel(){
   el('gpVal').textContent = Math.round(SPD_P*100)+'%';
   el('gbVal').textContent = Math.round(SPD_B*100)+'%';
   el('gdSel').value = ''+BOT_DIFF;
+  var gs=Math.round(G_SPRINT*100), gc=Math.round(G_CURVE*100), gk=Math.round(G_SHOT*100);
+  el('ggsInp').value=gs; el('ggsVal').textContent=gs+'%';
+  el('ggcInp').value=gc; el('ggcVal').textContent=gc+'%';
+  el('ggkInp').value=gk; el('ggkVal').textContent=gk+'%';
 }
 
 el('pwBtn').onclick = function(){
@@ -2038,12 +2180,24 @@ function applyLive(){
   el('gpVal').textContent = Math.round(sp*100)+'%';
   el('gbVal').textContent = Math.round(sb*100)+'%';
   var bd = parseInt(el('gdSel').value,10);
-  if(role==='host'){ SPD_P=sp; SPD_B=sb; BOT_DIFF=bd; LOBBY.cfg.diff=bd; }
-  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, bd:bd}); }
+  var gs = parseInt(el('ggsInp').value,10)/100;
+  var gc = parseInt(el('ggcInp').value,10)/100;
+  var gk = parseInt(el('ggkInp').value,10)/100;
+  el('ggsVal').textContent = Math.round(gs*100)+'%';
+  el('ggcVal').textContent = Math.round(gc*100)+'%';
+  el('ggkVal').textContent = Math.round(gk*100)+'%';
+  if(role==='host'){
+    SPD_P=sp; SPD_B=sb; BOT_DIFF=bd; G_SPRINT=gs; G_CURVE=gc; G_SHOT=gk;
+    LOBBY.cfg.diff=bd; LOBBY.cfg.gSprint=gs; LOBBY.cfg.gCurve=gc; LOBBY.cfg.gShot=gk;
+  }
+  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, bd:bd, gs:gs, gc:gc, gk2:gk}); }
 }
 el('gpInp').oninput = applyLive;
 el('gbInp').oninput = applyLive;
 el('gdSel').onchange = applyLive;
+el('ggsInp').oninput = applyLive;
+el('ggcInp').oninput = applyLive;
+el('ggkInp').oninput = applyLive;
 
 el('pauseBtn2').onclick = function(){
   if(role==='host'){ G.paused = !G.paused; }
