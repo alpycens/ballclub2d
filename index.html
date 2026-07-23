@@ -113,8 +113,9 @@
   /* olcekleme */
   #gameScale { transform-origin: top center; }
   #fsBtn { flex:0 0 auto; padding:5px 12px; font-size:12px; }
-  body.fsmode { justify-content:center; padding:0; margin:0; }
+  body.fsmode { justify-content:center; align-items:center; padding:0; margin:0; overflow:hidden; }
   body.fsmode #gameWrap { margin-top:0; }
+  body.fsmode #menu, body.fsmode #lobby { margin-top:0; }
   html:fullscreen, html:-webkit-full-screen { background:#1B2125; }
   html:fullscreen body, html:-webkit-full-screen body { min-height:100vh; justify-content:center; background:#1B2125; }
 
@@ -2649,22 +2650,30 @@ function fsActive(){
 }
 function fitScale(){
   var sc = el('gameScale'); if(!sc || el('gameWrap').style.display==='none') return;
-  sc.style.transform = 'scale(1)';
+  // olcusuz haliyle gercek boyutu al
+  sc.style.transform = 'none';
+  sc.style.marginBottom = '0px';
   var w = sc.offsetWidth, hh = sc.offsetHeight;
   if(!w || !hh) return;
   var fs = fsActive();
-  var pad = fs ? 6 : 24;
+  var pad = fs ? 8 : 24;
   var vw = window.innerWidth - pad;
   var vh = window.innerHeight - pad;
   var k = Math.min(vw/w, vh/hh);
   k = Math.max(0.5, Math.min(k, fs ? 4 : 2.2));
   document.body.classList.toggle('fsmode', !!fs);
   sc.style.transform = 'scale(' + k + ')';
+  // ÖNEMLİ: transform layout boyutunu degistirmez. Buyuyen gorsel yukseklik kadar
+  // yer ayirmazsak alt kisim (sohbet) ekranin disinda kalir.
+  sc.style.marginBottom = Math.round(hh * (k - 1)) + 'px';
   applyCanvasRes(k);
 }
 window.addEventListener('resize', fitScale);
-document.addEventListener('fullscreenchange', function(){ setTimeout(fitScale, 80); });
-document.addEventListener('webkitfullscreenchange', function(){ setTimeout(fitScale, 80); });
+function refitSoon(){ [30, 120, 350, 800].forEach(function(ms){ setTimeout(fitScale, ms); }); }
+document.addEventListener('fullscreenchange', refitSoon);
+document.addEventListener('webkitfullscreenchange', refitSoon);
+// F11 ile girilen tam ekranda fullscreenchange tetiklenmez; boyut degisimini yakala
+window.addEventListener('resize', refitSoon);
 
 /* ================= SOHBET ================= */
 function addChat(name, team, text, sys){
@@ -3130,8 +3139,7 @@ el('fsBtn').onclick = function(){
     if(!isFs()){ if(req){ var pr = req.call(el0); if(pr && pr.catch) pr.catch(function(){}); } }
     else { if(exit) exit.call(document); }
   } catch(e){}
-  setTimeout(fitScale, 120);
-  setTimeout(fitScale, 400);
+  refitSoon();
 };
 
 el('lobbyBtn').onclick = function(){
