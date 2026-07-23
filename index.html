@@ -593,9 +593,9 @@ function newPlayer(id, name, team, bot, stats){
 
 function buildGameFromRoster(){
   applyCfgLocal();
-  G = { players:[], ball:{x:W/2,y:H/2,vx:0,vy:0,cw:null,ct:0,cd:null,spin:0}, score:[0,0],
+  G = { players:[], ball:{x:W/2,y:H/2,vx:0,vy:0,cw:null,ct:0,cd:null,spin:0,kickGrace:0}, score:[0,0],
         phase:'play', ptimer:0, msg:'', over:false, paused:false,
-        koTeam:0, ko:true, t:0, clock:0 };
+        koTeam:0, ko:true, t:0, clock:0, lastTouch:null, goalN:0 };
   LOBBY.roster.forEach(function(s){
     if(s.team!==0 && s.team!==1) return;          // seyirci sahada degil
     var p = newPlayer(s.id, s.name, s.team, !!s.bot, s.bot ? null : s.stats);
@@ -624,8 +624,9 @@ function applyCfgLocal(){
 
 function resetPositions(){
   G.ball.x = W/2; G.ball.y = H/2; G.ball.vx = 0; G.ball.vy = 0;
-  G.ball.cw = null; G.ball.ct = 0; G.ball.cd = null; G.ball.spin = 0;
+  G.ball.cw = null; G.ball.ct = 0; G.ball.cd = null; G.ball.spin = 0; G.ball.kickGrace = 0;
   G.ko = true;
+  G.koTimer = 7000;   // vurulmazsa kisit otomatik kalkar
   for(var t=0;t<2;t++){
     var team = G.players.filter(function(p){return p.team===t;});
     var groups = { def:[], mid:[], fwd:[] };
@@ -710,18 +711,21 @@ function resolveBallPlayers(nearWall){
       q.y -= ny*overlap*(1-wBall)*0.5;
       ball.x = q.x + nx*minD;
       ball.y = q.y + ny*minD;
+      var bspPre = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);   // temas oncesi hiz
       var rel = (ball.vx-q.vx)*nx + (ball.vy-q.vy)*ny;
       if(rel < 0){ ball.vx -= 1.9*wBall*rel*nx; ball.vy -= 1.9*wBall*rel*ny; }
       ball.vx += q.vx*0.20*wBall; ball.vy += q.vy*0.20*wBall;
-      // saf dokunusla kazanilan hiz, oyuncunun hizini fazla asamaz (dribbling)
+      // Dokunus topu tekme gibi firlatmasin: temasin KAZANDIRDIGI hiz sinirli.
+      // Zaten hizli gelen top (sut/pas/sekme) asla yavaslatilmaz.
       var qsp = Math.sqrt(q.vx*q.vx + q.vy*q.vy);
       var bsp2 = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
-      var capSp = Math.max(qsp*1.15, 1.2);
+      var capSp = Math.max(qsp*1.15, 1.2, bspPre);
       if(bsp2 > capSp && bsp2 > 0.0001){
         var kf = capSp/bsp2;
         ball.vx *= kf; ball.vy *= kf;
       }
       ball.cw = null; ball.ct = 0; ball.cd = null; ball.spin = 0;   // dokunus falsoyu bitirir
+      G.lastTouch = { id:q.id, team:q.team, name:q.name };           // gol sahibi icin
       G.ko = false;
       hits++; sumNx += nx; sumNy += ny;
       deep.push(q);
@@ -792,6 +796,11 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
   }
   var play = (G.phase==='play');
   G.t += dt;
+  if(G.ball.kickGrace > 0) G.ball.kickGrace = Math.max(0, G.ball.kickGrace - dt*TICK_MS);
+  if(play && G.ko){
+    G.koTimer = (G.koTimer==null ? 7000 : G.koTimer) - dt*TICK_MS;
+    if(G.koTimer <= 0) G.ko = false;      // kimse baslama vurusunu yapmadi: oyun akmaya devam etsin
+  }
   if(play){
     G.clock += dt*TICK_MS;
     if(matchMins>0 && G.clock >= matchMins*60000){ endMatchByTime(); }
@@ -1046,13 +1055,25 @@ function endMatchByTime(){
 
 function scoreGoal(team){
   G.score[team]++;
+  G.goalN = (G.goalN||0) + 1;                        // gol sesi tetigi
+  var lt = G.lastTouch;
+  var teamName = (team===0 ? 'KIRMIZI' : 'MAVİ');
+  var scorerTxt;
+  if(lt && lt.team === team){
+    scorerTxt = lt.name.toUpperCase() + ' GOL!';
+  } else if(lt){
+    scorerTxt = 'KENDİ KALESİNE! ' + lt.name.toUpperCase();
+  } else {
+    scorerTxt = teamName + ' GOL!';
+  }
+  G.scorer = scorerTxt;
   if(maxGoals > 0 && G.score[team] >= maxGoals){
     G.phase='end'; G.ptimer=4000;
-    G.msg = (team===0?'KIRMIZI':'MAVİ') + ' MAÇI KAZANDI!';
+    G.msg = scorerTxt + '  ·  ' + teamName + ' MAÇI KAZANDI!';
     G.koTeam = 0; // yeni mac hep kirmizi baslar
   } else {
     G.phase='goal'; G.ptimer=2200;
-    G.msg = (team===0?'KIRMIZI':'MAVİ') + ' GOL!';
+    G.msg = scorerTxt;
     G.koTeam = 1 - team; // golu yiyen takim baslar
   }
 }
@@ -1073,6 +1094,7 @@ function applyKickImpulse(p, spd){
   var bs = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
   var maxB = SHOOT_SPD*SPD_B*1.75;
   if(bs > maxB){ var kf = maxB/bs; ball.vx *= kf; ball.vy *= kf; }
+  ball.kickGrace = 280;     // vurustan sonra dribbling hiz siniri uygulanmaz
   return { nx:nx, ny:ny };
 }
 
@@ -1092,6 +1114,7 @@ function tryKick(p, kind){
   p.flash = 160;
   p.kickN = (p.kickN||0) + 1;                       // ses tetigi
   p.kickPow = (kind==='shoot' || kind==='cshoot') ? 1 : 0;
+  G.lastTouch = { id:p.id, team:p.team, name:p.name };
   p.kcd = 220;
   return true;
 }
@@ -1229,7 +1252,8 @@ function botThink(){
             p.throughKick = false;
             var ls=lineupSpot(tax, tay);
             var w3=avoidBallPath(p, ls.x, ls.y);
-            var rSprint = D.sprint && p.stamina>D.stamMin*0.35 && !p.lock;
+            var rSprint = D.sprint && p.stamina>D.stamMin*0.35 && !p.lock &&
+                          Math.hypot(w3.x-p.x, w3.y-p.y) > 110;
             moveBot(p, w3.x, w3.y, rSprint);
           }
         } else if(Math.abs(p.x-gx) < D.shootRange + BOT_STYLE[t]*40 &&
@@ -1241,7 +1265,8 @@ function botThink(){
           if(!botKick(p, gx, aimY, SHOOT_SPD, minD)){
             var ls2=lineupSpot(gx, aimY);
             var w2=avoidBallPath(p, ls2.x, ls2.y);
-            var lSprint = D.sprint && p.stamina>D.stamMin*0.5 && !p.lock;
+            var lSprint = D.sprint && p.stamina>D.stamMin*0.5 && !p.lock &&
+                          Math.hypot(w2.x-p.x, w2.y-p.y) > 110;
             moveBot(p, w2.x, w2.y, lSprint);
           }
         } else if(bestPassMate(p, t)){
@@ -1250,11 +1275,11 @@ function botThink(){
           if(!botKick(p, pm.x, pm.y, PASS_SPD, 0.30)){
             var ls3 = lineupSpot(pm.x, pm.y);
             var w4 = avoidBallPath(p, ls3.x, ls3.y);
-            moveBot(p, w4.x, w4.y, D.sprint && p.stamina>D.stamMin*0.5 && !p.lock);
+            moveBot(p, w4.x, w4.y, D.sprint && p.stamina>D.stamMin*0.5 && !p.lock && Math.hypot(w4.x-p.x,w4.y-p.y)>110);
           }
         } else {
           // top sür: rakip kaleye doğru, stamina varsa sprintle (gol odakli)
-          var drSprint = D.sprint && p.stamina > D.stamMin*0.5 && !p.lock;
+          var drSprint = D.sprint && p.stamina > D.stamMin*0.5 && !p.lock && Math.abs(p.x-gx) > 220;
           moveBot(p, gx, gy, drSprint);
         }
       } else if(p===chaser){
@@ -1284,7 +1309,7 @@ function botThink(){
           shotTaken = botKick(p, gx2, aimY2, SHOOT_SPD, md);
         }
         if(!shotTaken){
-          var sprint = Dc.sprint && dist(p,ball) > Dc.sprintDist*0.55 && p.stamina > Dc.stamMin*0.3 && !p.lock;
+          var sprint = Dc.sprint && dist(p,ball) > Math.max(95, Dc.sprintDist) && p.stamina > Dc.stamMin*0.3 && !p.lock;
           // topa dogru taraftan yaklas: arkasina gec ki temas topu ILERI itsin
           var cxv = ball.x-p.x, cyv = ball.y-p.y, cl2 = Math.sqrt(cxv*cxv+cyv*cyv)||1;
           var gxv = aimTX-ball.x, gyv = aimTY-ball.y, gl2 = Math.sqrt(gxv*gxv+gyv*gyv)||1;
@@ -1398,6 +1423,7 @@ function botKick(p, ax, ay, spd, minDot){
   p.flash=160;
   p.kickN = (p.kickN||0) + 1;                       // ses tetigi
   p.kickPow = (spd >= SHOOT_SPD) ? 1 : 0;
+  G.lastTouch = { id:p.id, team:p.team, name:p.name };
   p.kcd = DIFFS[BOT_DIFF].kcd;
   return true;
 }
@@ -1629,7 +1655,7 @@ function broadcast(){
         ks:p.kickN||0, kw:p.kickPow||0 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
     s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF,BOT_STYLE[0],BOT_STYLE[1],G_SPRINT,G_CURVE,G_SHOT,BALL_MASS],
-    ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam, ck: Math.round(G.clock), mm: matchMins };
+    ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam, ck: Math.round(G.clock), mm: matchMins, gn: G.goalN||0 };
   for(var k in conns){ try{ conns[k].send(st); }catch(e){} }
 }
 
@@ -1719,7 +1745,7 @@ function loop(now){
       }
       Gr.p = Gr.p.filter(function(rp){ return G.p.some(function(tp){return tp.i===rp.i;}); });
       Gr.b[0] += (G.b[0]-Gr.b[0])*t; Gr.b[1] += (G.b[1]-Gr.b[1])*t;
-      Gr.s=G.s; Gr.ph=G.ph; Gr.m=G.m; Gr.pa=G.pa; Gr.ko=G.ko; Gr.kt=G.kt; Gr.ck=G.ck; Gr.mm=G.mm;
+      Gr.s=G.s; Gr.ph=G.ph; Gr.m=G.m; Gr.pa=G.pa; Gr.ko=G.ko; Gr.kt=G.kt; Gr.ck=G.ck; Gr.mm=G.mm; Gr.gn=G.gn;
       render(Gr);
     }
   }
@@ -1729,7 +1755,7 @@ function loop(now){
 function hostView(){
   return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0,kp:(p.keeper&&p.bot)?1:0,sr:p.spr?1:0,kn:(p.kit&&p.kit.num)||0,kc:(p.kit&&p.kit.color)||'',ks:p.kickN||0,kw:p.kickPow||0};}),
            b:[G.ball.x,G.ball.y], s:G.score, ph:G.phase, m:G.msg, pa:G.paused?1:0,
-           ko:(G.ko && G.phase==='play')?1:0, kt:G.koTeam, ck:Math.round(G.clock), mm:matchMins };
+           ko:(G.ko && G.phase==='play')?1:0, kt:G.koTeam, ck:Math.round(G.clock), mm:matchMins, gn:G.goalN||0 };
 }
 
 function kitLum(hex){
@@ -1787,7 +1813,50 @@ function playKick(power, vol){
   } catch(e){}
 }
 
+// Gol sesi: yukselen uc nota + kisa alkis benzeri gurultu kabarmasi
+function playGoal(){
+  if(!sfxOn) return;
+  initAudio();
+  if(!audioCtx) return;
+  var t = audioCtx.currentTime;
+  try {
+    var notes = [523.25, 659.25, 783.99, 1046.5];   // C E G C
+    notes.forEach(function(f, i){
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(f, t + i*0.10);
+      g.gain.setValueAtTime(0.0001, t + i*0.10);
+      g.gain.exponentialRampToValueAtTime(0.20, t + i*0.10 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + i*0.10 + 0.34);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t + i*0.10); o.stop(t + i*0.10 + 0.36);
+    });
+    // alkis/ugultu: filtrelenmis gurultu kabarip soner
+    var len = Math.floor(audioCtx.sampleRate * 1.1);
+    var buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    var d = buf.getChannelData(0);
+    for(var i=0;i<len;i++){
+      var env = Math.min(1, i/(audioCtx.sampleRate*0.18)) * Math.pow(1 - i/len, 1.6);
+      d[i] = (Math.random()*2-1) * env;
+    }
+    var src = audioCtx.createBufferSource(); src.buffer = buf;
+    var f2 = audioCtx.createBiquadFilter(); f2.type='bandpass'; f2.frequency.value=900; f2.Q.value=0.6;
+    var ng = audioCtx.createGain(); ng.gain.value = 0.16;
+    src.connect(f2); f2.connect(ng); ng.connect(audioCtx.destination);
+    src.start(t);
+  } catch(e){}
+}
+var lastGoalN = null;
+
 // Render'da vurus sayaci artan oyuncular icin ses cal (host ve istemci ayni sekilde)
+function pollGoalSound(v){
+  if(!v) return;
+  var n = v.gn || 0;
+  if(lastGoalN === null){ lastGoalN = n; return; }   // ilk karede calma
+  if(n > lastGoalN) playGoal();
+  lastGoalN = n;
+}
+
 function pollKickSounds(v){
   if(!v || !v.p) return;
   for(var i=0;i<v.p.length;i++){
@@ -1812,6 +1881,7 @@ function pollKickSounds(v){
 
 /* ================= ÇİZİM ================= */
 function render(v){
+  pollGoalSound(v);
   pollKickSounds(v);
   ctx.clearRect(0,0,W,H);
   ctx.lineJoin='round'; ctx.lineCap='round';
