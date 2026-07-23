@@ -324,11 +324,11 @@ var CIRCLE_R = 70;                                  // orta yuvarlak yaricapi
 var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, cap0:null, cap1:null }, started:false };
 var DIFF_NAMES = ['Beginner','Intermediate','Advanced','Expert','Master'];
 var DIFFS = [
-  { spd:0.88, aimErr:0.46, shootRange:280, sprint:true, sprintDist:120, kcd:560, keepErr:30, press:0, stamMin:45 },
-  { spd:1.05, aimErr:0.28, shootRange:400, sprint:true, sprintDist:70,  kcd:360, keepErr:16, press:1, stamMin:32 },
-  { spd:1.20, aimErr:0.16, shootRange:520, sprint:true, sprintDist:42,  kcd:265, keepErr:8,  press:1, stamMin:22 },
-  { spd:1.34, aimErr:0.09, shootRange:640, sprint:true, sprintDist:26,  kcd:195, keepErr:3,  press:2, stamMin:14 },
-  { spd:1.48, aimErr:0.04, shootRange:780, sprint:true, sprintDist:16,  kcd:150, keepErr:0,  press:2, stamMin:8  }
+  { spd:0.88, aimErr:0.46, shootRange:250, sprint:true, sprintDist:120, kcd:560, keepErr:30, press:0, stamMin:45, aimDot:0.10, keepOut:0.20 },
+  { spd:1.05, aimErr:0.28, shootRange:330, sprint:true, sprintDist:70,  kcd:360, keepErr:16, press:1, stamMin:32, aimDot:0.50, keepOut:0.35 },
+  { spd:1.20, aimErr:0.16, shootRange:450, sprint:true, sprintDist:42,  kcd:265, keepErr:8,  press:1, stamMin:22, aimDot:0.70, keepOut:0.50 },
+  { spd:1.34, aimErr:0.09, shootRange:640, sprint:true, sprintDist:26,  kcd:195, keepErr:3,  press:2, stamMin:14, aimDot:0.80, keepOut:0.65 },
+  { spd:1.48, aimErr:0.04, shootRange:780, sprint:true, sprintDist:16,  kcd:150, keepErr:0,  press:2, stamMin:8,  aimDot:0.92, keepOut:0.80 }
 ];
 var TICK_MS = 1000/60, NET_MS = 1000/30;
 
@@ -479,8 +479,17 @@ function resolveBallPlayers(nearWall){
       ball.y = q.y + ny*minD;
       // hiz: oyuncuya gore yaklasma bileseni yansitilir + oyuncunun itisi
       var rel = (ball.vx-q.vx)*nx + (ball.vy-q.vy)*ny;
-      if(rel < 0){ ball.vx -= 1.3*rel*nx; ball.vy -= 1.3*rel*ny; }
-      ball.vx += q.vx*0.18; ball.vy += q.vy*0.18;
+      // yumusak temas: top tekme yemis gibi firlamaz, oyuncuyla birlikte surulur
+      if(rel < 0){ ball.vx -= 0.95*rel*nx; ball.vy -= 0.95*rel*ny; }
+      ball.vx += q.vx*0.10; ball.vy += q.vy*0.10;
+      // saf dokunusla kazanilan hiz, oyuncunun hizini fazla asamaz (dribbling)
+      var qsp = Math.sqrt(q.vx*q.vx + q.vy*q.vy);
+      var bsp2 = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+      var capSp = Math.max(qsp*1.15, 1.2);
+      if(bsp2 > capSp && bsp2 > 0.0001){
+        var kf = capSp/bsp2;
+        ball.vx *= kf; ball.vy *= kf;
+      }
       ball.cw = null; ball.ct = 0; ball.cd = null;   // dokunus falsoyu bitirir
       G.ko = false;
       hits++; sumNx += nx; sumNy += ny;
@@ -860,11 +869,25 @@ function botThink(){
       var hasBall = dist(p,ball) < KICK_RANGE;
 
       if(p===keeper && p!==chaser && !hasBall){
-        // kale cizgisinde topu takip et
-        var kx = t===0 ? PX0+42 : PX1-42;
-        var kerr = DIFFS[BOT_DIFF].keepErr;
-        var kyy = Math.max(GY0+14, Math.min(GY1-14, ball.y + Math.sin(G.t/22 + p.y)*kerr));
-        moveBot(p, kx, kyy, false);
+        // aciyi kapat: kale merkezinden topa uzanan cizgi uzerinde one cik
+        var Dk = DIFFS[BOT_DIFF];
+        var gcx = t===0 ? PX0+10 : PX1-10, gcy = (GY0+GY1)/2;
+        var vx0 = ball.x-gcx, vy0 = ball.y-gcy;
+        var vl0 = Math.sqrt(vx0*vx0+vy0*vy0) || 1;
+        // top yaklastikca daha cok cik (aciyi daralt), uzaksa cizgiye don
+        var maxOut = PEN_W * (0.28 + Dk.keepOut*0.55);
+        var near = Math.max(0, 1 - vl0/(PEN_W*2.6));
+        var out = 26 + maxOut*near;
+        out = Math.min(out, vl0*0.55);                    // topu gecmesin
+        var kx = gcx + (vx0/vl0)*out;
+        var kyy = gcy + (vy0/vl0)*out;
+        kyy += Math.sin(G.t/22 + p.y) * Dk.keepErr;       // seviye hatasi
+        // ceza sahasi icinde kal
+        var pbK = penBox(t);
+        kx = Math.max(pbK.x0+6, Math.min(pbK.x1-6, kx));
+        kyy = Math.max(pbK.y0+6, Math.min(pbK.y1-6, kyy));
+        var kSprint = Dk.sprint && vl0 < PEN_W*1.5 && p.stamina > Dk.stamMin*0.4 && !p.lock;
+        moveBot(p, kx, kyy, kSprint);
         slot++;
         continue;
       }
@@ -891,8 +914,9 @@ function botThink(){
           if(botKick(p, tax, tay, tspd, 0.28)){ req.passReq=0; req.shootReq=0; }
           else {
             var ls=lineupSpot(tax, tay);
+            var w3=avoidBallPath(p, ls.x, ls.y);
             var rSprint = D.sprint && p.stamina>D.stamMin*0.6 && !p.lock;
-            moveBot(p, ls.x, ls.y, rSprint);
+            moveBot(p, w3.x, w3.y, rSprint);
           }
         } else if(Math.abs(p.x-gx) < D.shootRange + BOT_STYLE[t]*40){
           // sut: gole yaklastikca daha atilgan (dusuk hizalanma esigi)
@@ -901,12 +925,13 @@ function botThink(){
           var minD = distGoal < 170 ? 0.15 : (distGoal < 320 ? 0.35 : 0.5);
           if(!botKick(p, gx, aimY, SHOOT_SPD, minD)){
             var ls2=lineupSpot(gx, aimY);
+            var w2=avoidBallPath(p, ls2.x, ls2.y);
             var lSprint = D.sprint && p.stamina>D.stamMin && !p.lock;
-            moveBot(p, ls2.x, ls2.y, lSprint);
+            moveBot(p, w2.x, w2.y, lSprint);
           }
         } else if(Math.random()<0.004){
           var m = nearestMate(p);
-          if(m){ if(!botKick(p, m.x, m.y, PASS_SPD, 0.4)){ var ls3=lineupSpot(m.x,m.y); moveBot(p, ls3.x, ls3.y, false); } }
+          if(m){ if(!botKick(p, m.x, m.y, PASS_SPD, 0.4)){ var ls3=lineupSpot(m.x,m.y); var w4=avoidBallPath(p, ls3.x, ls3.y); moveBot(p, w4.x, w4.y, false); } }
         } else {
           // top sür: rakip kaleye doğru, stamina varsa sprintle (gol odakli)
           var drSprint = D.sprint && p.stamina > D.stamMin && !p.lock;
@@ -938,7 +963,11 @@ function botThink(){
           var alignDot = (cxv/cl2)*(gxv/gl2) + (cyv/cl2)*(gyv/gl2);
           var tgX, tgY;
           if(alignDot > 0.3){ tgX = ball.x; tgY = ball.y; }        // zaten arkasindayim: topa git
-          else { var lsc = lineupSpot(gx2, gy2); tgX = lsc.x; tgY = lsc.y; }  // yandan/onden: arkasina dolan
+          else {
+            var lsc = lineupSpot(gx2, gy2);
+            var wp = avoidBallPath(p, lsc.x, lsc.y);              // topa carpmadan arkasina dolan
+            tgX = wp.x; tgY = wp.y;
+          }
           moveBot(p, tgX, tgY, sprint);
         }
       } else if(pressOrder && !humanHolder){
@@ -958,11 +987,12 @@ function botThink(){
 
         if(p.role==='def'){
           // defans: geride cakili kalmaz, topun belirli mesafe gerisinden hucuma eslik eder
-          var gap = 240 - BOT_STYLE[t]*45;          // ofansif tarzda daha yakin takip
+          var gap = 300 - BOT_STYLE[t]*75;               // defansif: cok geriden, ofansif: yakindan
+          var fwdCap = [0.40, 0.58, 0.72][BOT_STYLE[t]];  // defansif tarzda cizgiyi asmaz
           if(t===0){
-            tx = Math.max(PX0+55, Math.min(ball.x - gap, W*0.62));
+            tx = Math.max(PX0+55, Math.min(ball.x - gap, W*fwdCap));
           } else {
-            tx = Math.min(PX1-55, Math.max(ball.x + gap, W*0.38));
+            tx = Math.min(PX1-55, Math.max(ball.x + gap, W*(1-fwdCap)));
           }
           ty = ball.y*0.55 + (PY0 + frac*(PY1-PY0))*0.45;   // topun y'sini de takip et
         }
@@ -1038,11 +1068,13 @@ function botKick(p, ax, ay, spd, minDot){
   if(dist(p, ball) > KICK_RANGE) return false;
   var cx=ball.x-p.x, cy=ball.y-p.y, cl=Math.sqrt(cx*cx+cy*cy)||1; cx/=cl; cy/=cl;
   var dx=ax-ball.x, dy=ay-ball.y, dl=Math.sqrt(dx*dx+dy*dy)||1; dx/=dl; dy/=dl;
-  if((cx*dx+cy*dy) < (minDot==null?0.5:minDot)) return false; // dogru taraftan degil
-  // temas yonu ile hedef yonunu zorluga gore harmanla: sert botlar hedefe daha yakin nisan alir
-  var aw = 0.34 + BOT_DIFF*0.16;           // beginner 0.34 ... master 0.98
-  var mx = cx*(1-aw) + dx*aw, my = cy*(1-aw) + dy*aw;
-  var ml = Math.sqrt(mx*mx+my*my)||1; mx/=ml; my/=ml;
+  // hizalanma esigi: zorluk arttikca bot daha disiplinli konumlanir, boylece daha isabetli vurur
+  var need;
+  if(minDot === -1) need = -1;                                   // kaleci: her yonden temizler
+  else need = Math.max(minDot==null?0:minDot, DIFFS[BOT_DIFF].aimDot);
+  if((cx*dx+cy*dy) < need) return false;   // dogru taraftan yaslanmamis: vurma, once konumlan
+  // SAF FIZIK: kuvvet oyuncu merkezinden temas noktasina dogru uygulanir (insandaki gibi)
+  var mx = cx, my = cy;
   var s = spd*SPD_B;
   ball.vx = mx*s; ball.vy = my*s;
   // sert vuruslarda falso: topu hedefe dogru bukecek dik bileseni sakla
@@ -1059,6 +1091,26 @@ function botKick(p, ax, ay, spd, minDot){
   p.flash=160;
   p.kcd = DIFFS[BOT_DIFF].kcd;
   return true;
+}
+
+// hedefe giderken yol topun uzerinden geciyorsa, topun yanindan dolanacak ara nokta uret
+function avoidBallPath(p, tx, ty){
+  var ball = G.ball;
+  var vx = tx-p.x, vy = ty-p.y;
+  var vl = Math.sqrt(vx*vx+vy*vy);
+  if(vl < 1) return { x:tx, y:ty };
+  var ux = vx/vl, uy = vy/vl;
+  var wx = ball.x-p.x, wy = ball.y-p.y;
+  var proj = wx*ux + wy*uy;
+  if(proj <= 0 || proj >= vl) return { x:tx, y:ty };     // top yolda degil
+  var perpX = wx - proj*ux, perpY = wy - proj*uy;
+  var pd = Math.sqrt(perpX*perpX + perpY*perpY);
+  var clear = PR + BR + 7;
+  if(pd >= clear) return { x:tx, y:ty };                 // yeterince uzaktan geciyor
+  var sx, sy;
+  if(pd < 0.001){ sx = -uy; sy = ux; }                   // tam uzerinden: dik yone kay
+  else { sx = -perpX/pd; sy = -perpY/pd; }               // topun ters tarafindan dolan
+  return { x: ball.x + sx*clear*1.5, y: ball.y + sy*clear*1.5 };
 }
 
 // botu topun, hedefe gore arka tarafina konumlandiracak nokta
