@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "updated": 1784815727839,
+  "updated": 1784816319831,
   "spdP": 0.6,
   "spdB": 0.6,
   "gSprint": 1,
-  "gCurve": 0.7,
+  "gCurve": 0.5,
   "gShot": 1,
   "bMass": 3,
   "diff": 2
