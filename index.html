@@ -762,25 +762,25 @@ function resolveBallPlayers(nearWall){
       var bspPre = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);   // temas oncesi top hizi
       var rel = (ball.vx-q.vx)*nx + (ball.vy-q.vy)*ny;
 
-      // 1) UZERINE GELEN TOP (sut/pas/sekme): oyuncu sabit engel gibi davranir -> top duzgun seker.
-      //    (Top agirligi yalnizca ITMEYI zorlastirir, bloklamayi degil.)
-      if(rel < 0 && bspPre > 1.4){
+      // 1) SERT GELEN TOP (sut/pas/sekme): oyuncu engel gibi davranir -> top seker.
+      //    Olcut topun mutlak hizi DEGIL, YAKLASMA hizidir; boylece yavas yuvarlanan
+      //    topa dokununca sekme yasanmaz (yapisma korunur).
+      if(rel < -2.0){
         var e = 0.62;
         ball.vx -= (1+e)*rel*nx;  ball.vy -= (1+e)*rel*ny;
-        // oyuncuya hafif geri tepme (topun momentumuyla orantili, sinirli)
-        var kick = Math.min(0.9, (-rel) * (mb/(qm+mb)) * 0.18);
+        var kick = Math.min(0.35, (-rel) * (mb/(qm+mb)) * 0.10);   // cok hafif geri tepme
         q.vx -= kick*nx;  q.vy -= kick*ny;
       }
 
-      // 2) TOPU ITME (dribbling): top yuvarlanir, oyuncu YAVASLAR ama asla geri sekmez
+      // 2) TOPU ITME / YASLANMA: top yumusakca yuvarlanir, oyuncu YAVASLAR ama geri sekmez
       var push = q.vx*nx + q.vy*ny;              // oyuncunun topa dogru hizi
       if(push > 0){
-        ball.vx += push*wB*1.7*nx;  ball.vy += push*wB*1.7*ny;
-        var slow = Math.min(push, push * (mb/(qm+mb)) * 0.55);   // agir top -> daha cok direnc
+        ball.vx += push*wB*1.25*nx;  ball.vy += push*wB*1.25*ny;
+        var slow = Math.min(push, push * (mb/(qm+mb)) * 0.55);     // agir top -> daha cok direnc
         q.vx -= slow*nx;  q.vy -= slow*ny;
       }
-      // cok hafif surukleme (top ayakta kalsin)
-      ball.vx += q.vx*0.05*wB; ball.vy += q.vy*0.05*wB;
+      // hafif surukleme: top ayagina yapisik kalsin
+      ball.vx += q.vx*0.09*wB; ball.vy += q.vy*0.09*wB;
       // Dokunus topu tekme gibi firlatmasin: temasin KAZANDIRDIGI hiz sinirli.
       // Zaten hizli gelen top (sut/pas/sekme) asla yavaslatilmaz.
       var qsp = Math.sqrt(q.vx*q.vx + q.vy*q.vy);
