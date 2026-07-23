@@ -71,6 +71,13 @@
   .keyRow button.listen { background:#5B8C3E; }
   #keyReset { width:100%; margin-top:10px; padding:7px 0; font-size:12px; }
   #keyNote { font-size:10px; color:#6E8089; margin-top:8px; }
+  #cfgShare { margin-top:12px; padding-top:10px; border-top:1px solid #3C4A52; }
+  #cfgShare .csTitle { font-size:10px; letter-spacing:1.5px; color:#CDE6B4; margin-bottom:5px; }
+  #cfgStatus { font-size:11px; color:#9FB3BB; margin-bottom:6px; }
+  #cfgShare .csRow { display:flex; gap:6px; }
+  #cfgShare .csRow button { flex:1; width:auto; margin-top:0; padding:6px 0; font-size:11px; }
+  #cfgShare .csHint { font-size:10px; color:#6E8089; margin-top:6px; line-height:1.35; }
+  #cfgShare .csHint b { color:#9FB3BB; }
   #pauseBtn2 { background:#7A5C2E; }
   #pauseBtn2:hover { background:#8F6C36; }
   #topBar { width:1000px; display:flex; align-items:center; justify-content:space-between;
@@ -302,6 +309,16 @@
       <input type="range" id="ggkInp" min="60" max="180" step="10" value="100">
       <label>Top ağırlığı: <span id="gbmVal">145%</span></label>
       <input type="range" id="gbmInp" min="50" max="300" step="5" value="145">
+      <div id="cfgShare">
+        <div class="csTitle">PAYLAŞILAN AYAR (config.json)</div>
+        <div id="cfgStatus">kontrol ediliyor...</div>
+        <div class="csRow">
+          <button id="cfgExport">JSON indir</button>
+          <button id="cfgImport">JSON yükle</button>
+        </div>
+        <input type="file" id="cfgFile" accept=".json,application/json" style="display:none">
+        <div class="csHint">İndirdiğin dosyayı repoya <b>config.json</b> adıyla yükle; siteye giren herkes bu ayarlarla oynar.</div>
+      </div>
       <label>Bot zorluğu</label>
       <select id="gdSel" style="width:100%;padding:7px 9px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:13px">
         <option value="0">Beginner</option>
@@ -310,6 +327,8 @@
         <option value="3">Expert</option>
         <option value="4">Master</option>
       </select>
+      <button id="cfgExportBtn" style="background:#3C6E4A">Ayarları JSON İndir</button>
+      <div id="cfgSrc" style="font-size:10px;color:#6E8089;margin-top:6px;line-height:1.4"></div>
       <button id="pauseBtn2">Maçı Durdur</button>
     </div>
   </div>
@@ -1701,6 +1720,81 @@ function drawGoal(x, dir){
 /* ================= KARAKTER STATLARI ================= */
 var myStats = loadStats();
 
+/* ============ PAYLASILAN AYAR DOSYASI (config.json) ============
+   Ayarlari JSON olarak disari aktarip repoya config.json adiyla koyarsan,
+   siteye giren HERKES ayni ayarlarla baslar (tarayici farketmez).
+   Dosyadaki 'version' degeri kayitli surumden yeniyse otomatik uygulanir. */
+function currentCfgObject(){
+  var c = LOBBY.cfg;
+  return {
+    version: Date.now(),
+    spdP: c.spdP, spdB: c.spdB, gSprint: c.gSprint, gCurve: c.gCurve,
+    gShot: c.gShot, bMass: c.bMass, diff: c.diff
+  };
+}
+
+function applyCfgObject(o){
+  if(!o || typeof o !== 'object') return false;
+  var c = LOBBY.cfg;
+  if(typeof o.spdP==='number')    c.spdP    = clampN(o.spdP, 0.5, 2, 1);
+  if(typeof o.spdB==='number')    c.spdB    = clampN(o.spdB, 0.5, 2, 1);
+  if(typeof o.gSprint==='number') c.gSprint = clampN(o.gSprint, 0.6, 1.8, 1);
+  if(typeof o.gCurve==='number')  c.gCurve  = clampN(o.gCurve, 0, 2.5, 1);
+  if(typeof o.gShot==='number')   c.gShot   = clampN(o.gShot, 0.6, 1.8, 1);
+  if(typeof o.bMass==='number')   c.bMass   = clampN(o.bMass, 0.5, 3, 1.45);
+  if(typeof o.diff==='number')    c.diff    = Math.max(0, Math.min(4, Math.round(o.diff)));
+  applyCfgLocal();
+  saveGameCfg();
+  return true;
+}
+
+function cfgStatus(txt, color){
+  var e = el('cfgStatus'); if(!e) return;
+  e.textContent = txt;
+  e.style.color = color || '#9FB3BB';
+}
+
+// sayfa acilisinda repodaki config.json'i dene
+function loadSharedConfig(){
+  var url = 'config.json?v=' + Date.now();
+  if(typeof fetch !== 'function'){ cfgStatus('bu tarayicida desteklenmiyor'); return; }
+  fetch(url, {cache:'no-store'}).then(function(r){
+    if(!r.ok) throw new Error('yok');
+    return r.json();
+  }).then(function(o){
+    var lastV = 0;
+    try { lastV = parseFloat(localStorage.getItem('bc2d_cfgver')) || 0; } catch(e){}
+    var v = (typeof o.version==='number') ? o.version : 1;
+    if(v > lastV){
+      applyCfgObject(o);
+      try { localStorage.setItem('bc2d_cfgver', String(v)); } catch(e){}
+      cfgStatus('paylaşılan ayar yüklendi (v' + v + ')', '#CDE6B4');
+    } else {
+      cfgStatus('paylaşılan ayar güncel (v' + v + ')', '#9FB3BB');
+    }
+    if(typeof syncPanel === 'function' && setUnlocked) syncPanel();
+  }).catch(function(){
+    cfgStatus('config.json bulunamadı - yerel ayarlar kullanılıyor');
+  });
+}
+
+function downloadCfgJson(){
+  var obj = currentCfgObject();
+  var txt = JSON.stringify(obj, null, 2);
+  try {
+    var blob = new Blob([txt], {type:'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'config.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
+    cfgStatus('indirildi - repoya config.json olarak yükle', '#CDE6B4');
+  } catch(e){
+    cfgStatus('indirme başarısız', '#E56E56');
+  }
+}
+
 /* Global oyun ayarlari: host degistirince kaydedilir, kurdugu HER odada
    gecerli olur ve odaya giren HERKESE otomatik uygulanir. */
 var GKEY = 'bc2d_gamecfg';
@@ -1713,21 +1807,93 @@ function loadGameCfg(){
         spdP: clampN(o.spdP, 0.5, 2, 1), spdB: clampN(o.spdB, 0.5, 2, 1),
         gSprint: clampN(o.gSprint, 0.6, 1.8, 1), gCurve: clampN(o.gCurve, 0, 2.5, 1),
         gShot: clampN(o.gShot, 0.6, 1.8, 1), bMass: clampN(o.bMass, 0.5, 3, 1.45),
-        diff: Math.max(0, Math.min(4, Math.round(o.diff!=null?o.diff:2)))
+        diff: Math.max(0, Math.min(4, Math.round(o.diff!=null?o.diff:2))),
+        updated: o.updated || 0
       };
     }
   } catch(e){}
-  return { spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:1.45, diff:2 };
+  return { spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:1.45, diff:2, updated:0 };
 }
 function clampN(v, lo, hi, dflt){
   if(typeof v !== 'number' || isNaN(v)) return dflt;
   return Math.max(lo, Math.min(hi, v));
 }
+/* settings.json: GitHub'a yuklenen ortak ayar dosyasi.
+   Siteyi acan HERKES bu dosyayi okur; boylece tum tarayicilar ayni ayarlarla baslar.
+   Host kendi ayarlarini degistirirse yerelde saklanir (daha yeni sayilir) ve
+   "Ayarları JSON İndir" ile disa aktarilip GitHub'a yuklenerek herkese dagitilir. */
+var REMOTE_CFG_URL = 'settings.json';
+var cfgSource = 'varsayılan';
+
+function applyCfgObject(o){
+  LOBBY.cfg.spdP    = clampN(o.spdP, 0.5, 2, 1);
+  LOBBY.cfg.spdB    = clampN(o.spdB, 0.5, 2, 1);
+  LOBBY.cfg.gSprint = clampN(o.gSprint, 0.6, 1.8, 1);
+  LOBBY.cfg.gCurve  = clampN(o.gCurve, 0, 2.5, 1);
+  LOBBY.cfg.gShot   = clampN(o.gShot, 0.6, 1.8, 1);
+  LOBBY.cfg.bMass   = clampN(o.bMass, 0.5, 3, 1.45);
+  if(o.diff != null) LOBBY.cfg.diff = Math.max(0, Math.min(4, Math.round(o.diff)));
+  applyCfgLocal();
+}
+
+function localCfgTime(){
+  try { var s = localStorage.getItem(GKEY); if(s) return JSON.parse(s).updated || 0; } catch(e){}
+  return 0;
+}
+
+function loadRemoteCfg(){
+  try {
+    fetch(REMOTE_CFG_URL + '?t=' + Date.now()).then(function(r){
+      if(!r.ok) throw new Error('yok');
+      return r.json();
+    }).then(function(o){
+      var remoteTime = o.updated || 1;
+      // yerelde daha YENI bir ayar varsa (host henuz disa aktarmamis) onu koru
+      if(localCfgTime() > remoteTime){
+        cfgSource = 'yerel (JSON’dan yeni)';
+      } else {
+        applyCfgObject(o);
+        try { var save = JSON.parse(JSON.stringify(o)); localStorage.setItem(GKEY, JSON.stringify(save)); } catch(e){}
+        cfgSource = 'settings.json (ortak)';
+      }
+      updateCfgSrcLabel();
+      if(role==='host'){ if(typeof syncPanel==='function') syncPanel(); if(typeof pushLobby==='function') pushLobby(); }
+    }).catch(function(){ cfgSource = 'yerel'; updateCfgSrcLabel(); });
+  } catch(e){ cfgSource='yerel'; updateCfgSrcLabel(); }
+}
+
+function updateCfgSrcLabel(){
+  var d = el('cfgSrc');
+  if(d) d.textContent = 'Ayar kaynağı: ' + cfgSource + ' · JSON’u indirip repoya settings.json olarak yükle, herkeste geçerli olsun.';
+}
+
+function exportGameCfg(){
+  var o = {
+    version: 1,
+    updated: Date.now(),
+    spdP: LOBBY.cfg.spdP, spdB: LOBBY.cfg.spdB,
+    gSprint: LOBBY.cfg.gSprint, gCurve: LOBBY.cfg.gCurve, gShot: LOBBY.cfg.gShot,
+    bMass: LOBBY.cfg.bMass, diff: LOBBY.cfg.diff
+  };
+  var txt = JSON.stringify(o, null, 2);
+  try {
+    var blob = new Blob([txt], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'settings.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  } catch(e){
+    window.prompt('settings.json içeriği (kopyala):', txt);
+  }
+}
+
 function saveGameCfg(){
   try {
     localStorage.setItem(GKEY, JSON.stringify({
       spdP: LOBBY.cfg.spdP, spdB: LOBBY.cfg.spdB, gSprint: LOBBY.cfg.gSprint,
-      gCurve: LOBBY.cfg.gCurve, gShot: LOBBY.cfg.gShot, bMass: LOBBY.cfg.bMass, diff: LOBBY.cfg.diff
+      gCurve: LOBBY.cfg.gCurve, gShot: LOBBY.cfg.gShot, bMass: LOBBY.cfg.bMass, diff: LOBBY.cfg.diff,
+      updated: Date.now()
     }));
   } catch(e){}
 }
@@ -2418,6 +2584,30 @@ el('ggsInp').oninput = applyLive;
 el('ggcInp').oninput = applyLive;
 el('ggkInp').oninput = applyLive;
 el('gbmInp').oninput = applyLive;
+el('cfgExportBtn').onclick = exportGameCfg;
+
+el('cfgExport').onclick = downloadCfgJson;
+el('cfgImport').onclick = function(){ el('cfgFile').click(); };
+el('cfgFile').onchange = function(){
+  var f = this.files && this.files[0];
+  if(!f) return;
+  var rd = new FileReader();
+  rd.onload = function(){
+    try {
+      var o = JSON.parse(rd.result);
+      if(applyCfgObject(o)){
+        try { localStorage.setItem('bc2d_cfgver', String(o.version||Date.now())); } catch(e){}
+        if(setUnlocked) syncPanel();
+        if(role==='host') pushLobby();
+        cfgStatus('JSON yüklendi ve uygulandı', '#CDE6B4');
+      }
+    } catch(e){ cfgStatus('geçersiz JSON dosyası', '#E56E56'); }
+  };
+  rd.readAsText(f);
+  this.value = '';
+};
+
+loadSharedConfig();
 
 el('pauseBtn2').onclick = function(){
   if(role==='host'){ G.paused = !G.paused; }
@@ -2450,6 +2640,10 @@ el('backToGameBtn').onclick = function(){
 el('endMatchBtn').onclick = endMatch;
 
 el('leaveBtn').onclick = function(){ location.reload(); };
+
+// sayfa acilir acilmaz ortak ayar dosyasini oku
+updateCfgSrcLabel();
+loadRemoteCfg();
 </script>
 </body>
 </html>

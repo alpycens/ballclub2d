@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "updated": 1,
+  "spdP": 1,
+  "spdB": 1,
+  "gSprint": 1,
+  "gCurve": 1,
+  "gShot": 1,
+  "bMass": 1.45,
+  "diff": 2
+}
