@@ -349,6 +349,24 @@ var PEER_OPTS = {
 
 var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 
+var canvasRes = 1;
+function applyCanvasRes(scaleK){
+  if(!cv) return;
+  var dpr = (window.devicePixelRatio || 1);
+  var r = Math.max(1, Math.min(3, dpr * (scaleK || 1)));
+  canvasRes = r;
+  var bw = Math.round(W*r), bh = Math.round(H*r);
+  if(cv.width !== bw || cv.height !== bh){
+    cv.width = bw; cv.height = bh;
+  }
+  cv.style.width = W+'px';
+  cv.style.height = H+'px';
+  if(ctx){
+    ctx.setTransform(r,0,0,r,0,0);
+    ctx.imageSmoothingEnabled = true;
+  }
+}
+
 function setField(fs){
   fieldSize = fs;
   if(fs==='small'){ W=760; H=400; GOAL_H=115; }
@@ -358,7 +376,7 @@ function setField(fs){
   GY0=(PY0+PY1)/2-GOAL_H/2; GY1=(PY0+PY1)/2+GOAL_H/2;
   PEN_W = Math.round((PX1-PX0)*0.13);
   PEN_EXT = Math.round(GOAL_H*0.3);
-  if(cv){ cv.width=W; cv.height=H; }
+  applyCanvasRes(canvasRes / (window.devicePixelRatio || 1));
   el('topBar').style.width=W+'px';
   el('botBar').style.width=W+'px';
   el('chatWrap').style.width=W+'px';
@@ -382,7 +400,7 @@ function penBox(t){
 function newPlayer(id, name, team, bot){
   return { id:id, name:name, team:team, bot:bot,
            x:0, y:0, vx:0, vy:0,
-           stamina:STAM_MAX, lock:false, kcd:0, passReq:0, flash:0, keeper:false,
+           stamina:STAM_MAX, lock:false, kcd:0, passReq:0, shootReq:0, flash:0, keeper:false,
            in:{u:0,d:0,l:0,r:0,s:0}, ev:[] };
 }
 
@@ -434,6 +452,85 @@ function resetPositions(){
 }
 
 /* ================= FİZİK (HOST) ================= */
+// top kati bir nesne: oyuncularla ust uste binemez, iki oyuncu arasinda sikisirsa disari kacar
+function resolveBallPlayers(nearWall){
+  var ball = G.ball;
+  for(var pass=0; pass<4; pass++){
+    var hits = 0, sumNx = 0, sumNy = 0, deep = [];
+    for(var i=0;i<G.players.length;i++){
+      var q = G.players[i];
+      var dx = ball.x-q.x, dy = ball.y-q.y;
+      var d = Math.sqrt(dx*dx+dy*dy);
+      var minD = PR + BR;
+      if(d >= minD) continue;
+      if(d < 0.0001){ dx = (Math.random()-0.5); dy = (Math.random()-0.5); d = Math.sqrt(dx*dx+dy*dy)||1; }
+      var nx = dx/d, ny = dy/d;
+      // konum duzeltmesi: topu oyuncunun disina it
+      ball.x = q.x + nx*minD;
+      ball.y = q.y + ny*minD;
+      // hiz: oyuncuya gore yaklasma bileseni yansitilir + oyuncunun itisi
+      var rel = (ball.vx-q.vx)*nx + (ball.vy-q.vy)*ny;
+      if(rel < 0){ ball.vx -= 1.3*rel*nx; ball.vy -= 1.3*rel*ny; }
+      ball.vx += q.vx*0.18; ball.vy += q.vy*0.18;
+      ball.cw = null; ball.ct = 0; ball.cd = null;   // dokunus falsoyu bitirir
+      G.ko = false;
+      hits++; sumNx += nx; sumNy += ny;
+      deep.push(q);
+    }
+    if(hits === 0) return;
+    // duvara sikisma: normal yonu duvardan disari cikaramiyorsa tegetsel (yan) kaydir
+    if(nearWall && pass >= 1){
+      var atWallY = (ball.y <= PY0+BR+0.5) || (ball.y >= PY1-BR-0.5);
+      var atWallX = (ball.x <= PX0+BR+0.5 && !(ball.y>GY0&&ball.y<GY1)) || (ball.x >= PX1-BR-0.5 && !(ball.y>GY0&&ball.y<GY1));
+      var sl2 = Math.sqrt(sumNx*sumNx + sumNy*sumNy) || 1;
+      if(atWallY){ var sgn = (sumNx>=0?1:-1); ball.x += sgn*2.2; ball.vx += sgn*0.7; }
+      else if(atWallX){ var sgn2 = (sumNy>=0?1:-1); ball.y += sgn2*2.2; ball.vy += sgn2*0.7; }
+    }
+    // iki oyuncu arasinda sikisma: aralarindaki cizgiye DIK yonde disari firlat
+    if(hits >= 2 && pass >= 1){
+      var a = deep[0], b = deep[1];
+      var ax = b.x-a.x, ay = b.y-a.y;
+      var al = Math.sqrt(ax*ax+ay*ay);
+      if(al < 0.0001){ ax = 1; ay = 0; al = 1; }
+      var ex = -ay/al, ey = ax/al;                 // dik yon
+      var mx0 = (a.x+b.x)/2, my0 = (a.y+b.y)/2;
+      if((ball.x-mx0)*ex + (ball.y-my0)*ey < 0){ ex = -ex; ey = -ey; }
+      var half = al/2;
+      var minD2 = PR + BR;
+      var need = Math.sqrt(Math.max(0, minD2*minD2 - half*half)) + 1.2;
+      ball.x = mx0 + ex*need;
+      ball.y = my0 + ey*need;
+      ball.vx += ex*1.5; ball.vy += ey*1.5;
+    }
+  }
+  // son care: 3+ oyuncu kiskaci - topu kumelerin disina, en yakin bos yone firlat
+  var stillHit = [];
+  for(var si=0; si<G.players.length; si++){
+    var sq = G.players[si];
+    if(Math.hypot(ball.x-sq.x, ball.y-sq.y) < PR+BR-0.3) stillHit.push(sq);
+  }
+  if(stillHit.length){
+    var cxs=0, cys=0;
+    for(var k2=0;k2<stillHit.length;k2++){ cxs+=stillHit[k2].x; cys+=stillHit[k2].y; }
+    cxs/=stillHit.length; cys/=stillHit.length;
+    var ox = ball.x-cxs, oy = ball.y-cys, ol = Math.sqrt(ox*ox+oy*oy);
+    if(ol < 0.0001){ var ang0 = Math.random()*Math.PI*2; ox = Math.cos(ang0); oy = Math.sin(ang0); ol = 1; }
+    ox/=ol; oy/=ol;
+    // kalabaligin en uzak noktasini bul, topu onun disina koy
+    var reach = 0;
+    for(var k3=0;k3<stillHit.length;k3++){
+      var pr2 = (stillHit[k3].x-cxs)*ox + (stillHit[k3].y-cys)*oy;
+      if(pr2 > reach) reach = pr2;
+    }
+    ball.x = cxs + ox*(reach + PR + BR + 1.5);
+    ball.y = cys + oy*(reach + PR + BR + 1.5);
+    ball.vx += ox*1.2; ball.vy += oy*1.2;
+    // saha disina tasmasin
+    ball.x = Math.max(PX0-GOAL_DEPTH+BR, Math.min(PX1+GOAL_DEPTH-BR, ball.x));
+    ball.y = Math.max(PY0+BR, Math.min(PY1-BR, ball.y));
+  }
+}
+
 function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
   if(G.phase==='goal' || G.phase==='end'){
     G.ptimer -= dt*TICK_MS;
@@ -459,6 +556,7 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     var p = G.players[i];
     p.kcd = Math.max(0, p.kcd - dt*TICK_MS);
     p.passReq = Math.max(0, p.passReq - dt*TICK_MS);
+    p.shootReq = Math.max(0, p.shootReq - dt*TICK_MS);
     p.flash = Math.max(0, p.flash - dt*TICK_MS);
     p.glow = !p.bot && !!(p.in.s || p.in.x || p.in.sp);
     var inp = (play || G.phase==='goal') ? p.in : {u:0,d:0,l:0,r:0,s:0};
@@ -535,9 +633,10 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     while(p.ev.length){
       var e = p.ev.shift();
       if(!play) continue;
-      if(e==='shoot') tryKick(p, 'shoot');
-      else if(e==='pass'){
-        if(!tryKick(p, 'pass')) p.passReq = 700; // topsuzsa bottan pas iste
+      if(e==='shoot'){
+        if(!tryKick(p, 'shoot')) { p.shootReq = 1300; p.passReq = 0; }  // topsuzsa bota "sut cek" emri
+      } else if(e==='pass'){
+        if(!tryKick(p, 'pass')) { p.passReq = 1300; p.shootReq = 0; }   // topsuzsa bottan pas iste
       }
     }
   }
@@ -551,6 +650,9 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
       pa.x-=nx*ov; pa.y-=ny*ov; pb.x+=nx*ov; pb.y+=ny*ov;
     }
   }
+
+  // oyuncular hareket etti: once topu katı nesne gibi disari it (uzerine binme olmasin)
+  resolveBallPlayers();
 
   // top
   var ball = G.ball;
@@ -580,21 +682,7 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
   for(var sub=0; sub<nSub; sub++){
     ball.x += ball.vx*dt/nSub; ball.y += ball.vy*dt/nSub;
 
-    // top - oyuncu çarpışması
-    for(var i2=0;i2<G.players.length;i2++){
-      var q = G.players[i2];
-      var dx2=ball.x-q.x, dy2=ball.y-q.y, d2=Math.sqrt(dx2*dx2+dy2*dy2);
-      if(d2>0 && d2 < PR+BR){
-        var nx2=dx2/d2, ny2=dy2/d2;
-        ball.x = q.x + nx2*(PR+BR);
-        ball.y = q.y + ny2*(PR+BR);
-        var rel = (ball.vx-q.vx)*nx2 + (ball.vy-q.vy)*ny2;
-        if(rel<0){ ball.vx -= 1.3*rel*nx2; ball.vy -= 1.3*rel*ny2; }
-        ball.vx += q.vx*0.18; ball.vy += q.vy*0.18;
-        ball.cw = null; ball.ct = 0; // dokunus falsoyu bitirir
-        G.ko = false;
-      }
-    }
+    resolveBallPlayers();
 
     // top - direk çarpışması: direğe çarpan top seker
     var bposts = goalPosts();
@@ -629,6 +717,8 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
         if(ball.y > GY1-BR){ ball.y=GY1-BR; ball.vy=-ball.vy*0.4; }
       }
     }
+    // duvar duzeltmesi topu bir oyuncunun icine itmis olabilir: tekrar coz
+    resolveBallPlayers(true);
   }
   ball.vx *= Math.pow(BDAMP, dt); ball.vy *= Math.pow(BDAMP, dt);
   var inMouth = ball.y > GY0 && ball.y < GY1;
@@ -673,8 +763,8 @@ function tryKick(p, kind){
   var l = Math.sqrt(tx*tx+ty*ty) || 1;
   spd *= SPD_B;
   ball.vx = tx/l*spd; ball.vy = ty/l*spd;
-  if(kind==='shoot'){ ball.cw = p.id; ball.ct = 850; }
-  else { ball.cw = null; ball.ct = 0; }
+  if(kind==='shoot'){ ball.cw = p.id; ball.ct = 850; ball.cd = null; }
+  else { ball.cw = null; ball.ct = 0; ball.cd = null; }
   G.ko = false;
   p.flash = 160;
   p.kcd = 220;
@@ -707,6 +797,14 @@ function botThink(){
     for(var hi=0; hi<team.length; hi++){
       if(!team[hi].bot && dist(team[hi], ball) < KICK_RANGE + 14){ humanHolder = team[hi]; break; }
     }
+    // insan komutu: X = bana pas, Space = kaleye sut
+    var cmdPlayer = null, cmdType = null;
+    for(var ci2=0; ci2<team.length; ci2++){
+      var hp = team[ci2];
+      if(hp.bot) continue;
+      if(hp.passReq > 0){ cmdPlayer = hp; cmdType = 'pass'; break; }
+      if(hp.shootReq > 0){ cmdPlayer = hp; cmdType = 'shoot'; break; }
+    }
     var chaser=null, bd=1e9;
     if(!humanHolder){
       for(var i=0;i<team.length;i++){
@@ -714,6 +812,19 @@ function botThink(){
         var d=dist(team[i],ball);
         if(d<bd){ bd=d; chaser=team[i]; }
       }
+    }
+    // emir verildiyse: en yakin bot mutlaka topa gitsin (kaleci disinda)
+    var cmdBot = null;
+    if(cmdPlayer){
+      var cbd = 1e9;
+      for(var cb=0; cb<team.length; cb++){
+        var q3 = team[cb];
+        if(!q3.bot) continue;
+        if(q3===keeper && !ballNearGoal) continue;
+        var d3 = dist(q3, ball);
+        if(d3 < cbd){ cbd = d3; cmdBot = q3; }
+      }
+      if(cmdBot) chaser = cmdBot;
     }
     var slot=0;
     for(var i2=0;i2<team.length;i2++){
@@ -733,26 +844,30 @@ function botThink(){
       }
 
       if(hasBall){
-        // insan takım arkadaşı pas istedi mi? (kaleci dahil herkes cevap verir)
-        var req = null;
-        for(var j=0;j<team.length;j++)
-          if(!team[j].bot && team[j].passReq>0 && team[j]!==p){ req=team[j]; break; }
+        var gx = t===0?PX1:PX0, gy=(GY0+GY1)/2;
+        var D = DIFFS[BOT_DIFF];
+        var req = (cmdPlayer && cmdPlayer!==p) ? cmdPlayer : null;
         if(p===keeper){
           var kax = t===0 ? W*0.72 : W*0.28, kay = PY0 + rnd(0.25,0.75)*(PY1-PY0);
-          if(req){ kax=req.x; kay=req.y; }
-          if(!botKick(p, kax, kay, SHOOT_SPD, -1)){    // kaleci her yonden temizler
+          if(req && cmdType==='pass'){ kax=req.x; kay=req.y; }
+          else if(req && cmdType==='shoot'){ kax=gx; kay=gy; }
+          if(!botKick(p, kax, kay, req?PASS_SPD:SHOOT_SPD, -1)){    // kaleci her yonden temizler
             moveBot(p, lineupSpot(kax,kay).x, lineupSpot(kax,kay).y, false);
-          } else if(req){ req.passReq=0; }
+          } else if(req){ req.passReq=0; req.shootReq=0; }
           slot++;
           continue;
         }
-        var gx = t===0?PX1:PX0, gy=(GY0+GY1)/2;
-        var D = DIFFS[BOT_DIFF];
         if(req){
-          // insan pas istedi: topa dogru taraftan yaslandiysa insana pas (top duz gider,
-          // arada rakip varsa ona carpar). Hizali degilse topun arkasina gecip konumlan.
-          if(botKick(p, req.x, req.y, PASS_SPD, 0.35)){ req.passReq=0; }
-          else { var ls=lineupSpot(req.x, req.y); moveBot(p, ls.x, ls.y, false); }
+          // insan emri: X -> bana pas, Space -> kaleye sut. Hizali degilse topun arkasina gec.
+          var tax, tay, tspd;
+          if(cmdType==='shoot'){ tax=gx; tay=gy + rnd(-GOAL_H*0.25, GOAL_H*0.25); tspd=SHOOT_SPD; }
+          else { tax=req.x; tay=req.y; tspd=PASS_SPD; }
+          if(botKick(p, tax, tay, tspd, 0.28)){ req.passReq=0; req.shootReq=0; }
+          else {
+            var ls=lineupSpot(tax, tay);
+            var rSprint = D.sprint && p.stamina>18 && !p.lock;
+            moveBot(p, ls.x, ls.y, rSprint);
+          }
         } else if(Math.abs(p.x-gx) < D.shootRange + BOT_STYLE[t]*40){
           // sut: gole yaklastikca daha atilgan (dusuk hizalanma esigi)
           var distGoal = Math.abs(p.x-gx);
@@ -868,7 +983,16 @@ function botKick(p, ax, ay, spd, minDot){
   var ml = Math.sqrt(mx*mx+my*my)||1; mx/=ml; my/=ml;
   var s = spd*SPD_B;
   ball.vx = mx*s; ball.vy = my*s;
-  ball.cw=null; ball.ct=0;
+  // sert vuruslarda falso: topu hedefe dogru bukecek dik bileseni sakla
+  if(spd >= SHOOT_SPD && BOT_DIFF >= 1){
+    var pdot = dx*mx + dy*my;
+    var px2 = dx - pdot*mx, py2 = dy - pdot*my;
+    var pl2 = Math.sqrt(px2*px2 + py2*py2);
+    if(pl2 > 0.02){
+      ball.cw = p.id; ball.ct = 700;
+      ball.cd = { x: px2/pl2, y: py2/pl2 };
+    } else { ball.cw=null; ball.ct=0; ball.cd=null; }
+  } else { ball.cw=null; ball.ct=0; ball.cd=null; }
   G.ko=false;
   p.flash=160;
   p.kcd = DIFFS[BOT_DIFF].kcd;
@@ -1121,6 +1245,7 @@ function fmtTime(ms){
 /* ================= ÇİZİM ================= */
 function render(v){
   ctx.clearRect(0,0,W,H);
+  ctx.lineJoin='round'; ctx.lineCap='round';
   // saha
   ctx.fillStyle='#718C5A'; ctx.fillRect(0,0,W,H);
   // koyu şerit doku
@@ -1454,6 +1579,7 @@ function fitScale(){
   var k = Math.min(vw/w, vh/hh);
   k = Math.max(0.5, Math.min(k, fs ? 4 : 2.2));
   sc.style.transform = 'scale(' + k + ')';
+  applyCanvasRes(k);
 }
 window.addEventListener('resize', fitScale);
 document.addEventListener('fullscreenchange', function(){ setTimeout(fitScale, 80); });
