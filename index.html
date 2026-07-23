@@ -457,6 +457,23 @@ function resetPositions(){
         p.vx = 0; p.vy = 0;
       });
     });
+    // baslama vurusunu YAPMAYAN takim ilk kareden itibaren cemberin disinda ve kendi yarisinda
+    if(t !== G.koTeam){
+      team.forEach(function(p){
+        if(t===0){ if(p.x > W/2-(PR+6)) p.x = W/2-(PR+6); }
+        else { if(p.x < W/2+(PR+6)) p.x = W/2+(PR+6); }
+        var rdx = p.x-W/2, rdy = p.y-H/2, rd = Math.sqrt(rdx*rdx+rdy*rdy);
+        var lim = CIRCLE_R + PR + 4;
+        if(rd < lim){
+          if(rd < 0.001){ rdx = (t===0?-1:1); rdy = (Math.random()<0.5?-1:1)*0.3; rd = Math.sqrt(rdx*rdx+rdy*rdy); }
+          p.x = W/2 + (rdx/rd)*lim;
+          p.y = H/2 + (rdy/rd)*lim;
+          if(t===0 && p.x > W/2-(PR+6)) p.x = W/2-(PR+6);
+          if(t===1 && p.x < W/2+(PR+6)) p.x = W/2+(PR+6);
+        }
+        p.y = Math.max(PY0+PR, Math.min(PY1-PR, p.y));
+      });
+    }
   }
 }
 
@@ -955,7 +972,14 @@ function botThink(){
         var Dc = DIFFS[BOT_DIFF];
         // hucum ucuncu bolgesinde topa erisince gordugu an sut cek (dribbleyip kaptirma)
         var gx2 = t===0?PX1:PX0, gy2=(GY0+GY1)/2;
-        var inFinal = t===0 ? (ball.x > W*0.52) : (ball.x < W*0.48);
+        // BILARDO HATTI: pas emri varsa istikamet BEN, sut emri varsa kale.
+        // Bot topa yaklasirken bile vucudunu bu hattin gerisine yerlestirir.
+        var aimTX = gx2, aimTY = gy2, obeying = false;
+        if(cmdPlayer && cmdPlayer!==p){
+          obeying = true;
+          if(cmdType==='pass'){ aimTX = cmdPlayer.x; aimTY = cmdPlayer.y; }
+        }
+        var inFinal = (!obeying || cmdType==='shoot') && (t===0 ? (ball.x > W*0.52) : (ball.x < W*0.48));
         var shotTaken = false;
         if(inFinal){
           // kaleciden uzak koseyi hedefle
@@ -973,12 +997,13 @@ function botThink(){
           var sprint = Dc.sprint && dist(p,ball) > Dc.sprintDist && p.stamina > Dc.stamMin*0.5 && !p.lock;
           // topa dogru taraftan yaklas: arkasina gec ki temas topu ILERI itsin
           var cxv = ball.x-p.x, cyv = ball.y-p.y, cl2 = Math.sqrt(cxv*cxv+cyv*cyv)||1;
-          var gxv = gx2-ball.x,  gyv = gy2-ball.y,  gl2 = Math.sqrt(gxv*gxv+gyv*gyv)||1;
+          var gxv = aimTX-ball.x, gyv = aimTY-ball.y, gl2 = Math.sqrt(gxv*gxv+gyv*gyv)||1;
           var alignDot = (cxv/cl2)*(gxv/gl2) + (cyv/cl2)*(gyv/gl2);
+          var alignNeed = obeying ? 0.55 : 0.3;   // emirde daha titiz hizalan
           var tgX, tgY;
-          if(alignDot > 0.3){ tgX = ball.x; tgY = ball.y; }        // zaten arkasindayim: topa git
+          if(alignDot > alignNeed){ tgX = ball.x; tgY = ball.y; }  // hattayim: topa bastir
           else {
-            var lsc = lineupSpot(gx2, gy2);
+            var lsc = lineupSpot(aimTX, aimTY);
             var wp = avoidBallPath(p, lsc.x, lsc.y);              // topa carpmadan arkasina dolan
             tgX = wp.x; tgY = wp.y;
           }
