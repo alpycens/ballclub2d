@@ -335,7 +335,7 @@
       <label>Şut gücü (herkes): <span id="ggkVal">100%</span></label>
       <input type="range" id="ggkInp" min="60" max="180" step="10" value="100">
       <label>Top ağırlığı: <span id="gbmVal">145%</span></label>
-      <input type="range" id="gbmInp" min="50" max="300" step="5" value="145">
+      <input type="range" id="gbmInp" min="50" max="600" step="10" value="220">
       <div id="cfgShare">
         <div class="csTitle">PAYLAŞILAN AYAR (config.json)</div>
         <div id="cfgStatus">kontrol ediliyor...</div>
@@ -398,7 +398,7 @@ var GOAL_H = 150, GY0 = (PY0+PY1)/2 - GOAL_H/2, GY1 = (PY0+PY1)/2 + GOAL_H/2;
 var fieldSize = 'big';
 var GOAL_DEPTH = 34;
 var PR = 15, BR = 8, POST_R = 6;
-var BALL_MASS = 1.45;   // top oyuncudan agir: itince az kayar, etrafinda donerek konum alabilirsin                    // yarıçaplar (POST_R: kale diregi)
+var BALL_MASS = 2.2;   // top oyuncudan agir: itince az kayar, etrafinda donerek konum alabilirsin                    // yarıçaplar (POST_R: kale diregi)
 var KICK_RANGE = PR + BR + 6;
 var ACC = 0.30, PDAMP = 0.925, BASE_MAX = 2.55, SPRINT_MAX = 4.25;
 // herkese uygulanan global carpanlar (host ayarlar, herkese yayilir)
@@ -496,7 +496,7 @@ var ROLE_TR = { gk:'Kaleci', def:'Defans', mid:'Orta Saha', fwd:'Forvet' };
 var matchMins = 0;                                  // 0 = suresiz
 var PEN_W = 114, PEN_EXT = 45;                      // ceza sahasi: derinlik ve kale ustu/alti tasma
 var CIRCLE_R = 70;                                  // orta yuvarlak yaricapi
-var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:1.45, tc0:'#E56E56', tc1:'#5689E5', cap0:null, cap1:null }, started:false };
+var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:2.2, tc0:'#E56E56', tc1:'#5689E5', cap0:null, cap1:null }, started:false };
 var DIFF_NAMES = ['Beginner','Intermediate','Advanced','Expert','Master'];
 var DIFFS = [
   { spd:1.00, aimErr:0.46, shootRange:250, sprint:true, sprintDist:120, kcd:560, keepErr:30, press:0, stamMin:45, aimDot:0.10, keepOut:0.20 },
@@ -620,7 +620,7 @@ function applyCfgLocal(){
   G_SPRINT = (typeof LOBBY.cfg.gSprint==='number') ? LOBBY.cfg.gSprint : 1;
   G_CURVE  = (typeof LOBBY.cfg.gCurve==='number')  ? LOBBY.cfg.gCurve  : 1;
   G_SHOT   = (typeof LOBBY.cfg.gShot==='number')   ? LOBBY.cfg.gShot   : 1;
-  BALL_MASS = (typeof LOBBY.cfg.bMass==='number')  ? LOBBY.cfg.bMass   : 1.45;
+  BALL_MASS = (typeof LOBBY.cfg.bMass==='number')  ? LOBBY.cfg.bMass   : 2.2;
   TEAM_COL[0] = cleanCol(LOBBY.cfg.tc0, DEF_TEAM_COL[0]);
   TEAM_COL[1] = cleanCol(LOBBY.cfg.tc1, DEF_TEAM_COL[1]);
 }
@@ -702,22 +702,34 @@ function resolveBallPlayers(nearWall){
       if(d >= minD) continue;
       if(d < 0.0001){ dx = (Math.random()-0.5); dy = (Math.random()-0.5); d = Math.sqrt(dx*dx+dy*dy)||1; }
       var nx = dx/d, ny = dy/d;
-      // konum duzeltmesi: topu oyuncunun disina it
-      ball.x = q.x + nx*minD;
-      ball.y = q.y + ny*minD;
-      // hiz: oyuncuya gore yaklasma bileseni yansitilir + oyuncunun itisi
-      // AGIR TOP: kutle orani - top az kayar, oyuncu bir miktar geri iter
-      var qm = q.mass || 1, tot = qm + BALL_MASS;
-      var wBall = qm/tot;                       // topun aldigi pay (~0.41)
       var overlap = minD - d;
-      q.x -= nx*overlap*(1-wBall)*0.5;          // oyuncu da geri itilir -> topa yaslanip donebilirsin
-      q.y -= ny*overlap*(1-wBall)*0.5;
-      ball.x = q.x + nx*minD;
-      ball.y = q.y + ny*minD;
+      var qm = q.mass || 1, mb = BALL_MASS;
+      // KUTLE ORANLI COZUM: ust uste binme kutlelere gore paylasilir.
+      // Top agirlastikca oyuncu daha cok geri iter -> topa yaslanip etrafinda donebilirsin.
+      var wB = qm/(qm+mb);        // topun aldigi pay
+      var wP = mb/(qm+mb);        // oyuncunun aldigi pay
+      ball.x += nx*overlap*wB;  ball.y += ny*overlap*wB;
+      q.x    -= nx*overlap*wP;  q.y    -= ny*overlap*wP;
       var bspPre = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);   // temas oncesi hiz
       var rel = (ball.vx-q.vx)*nx + (ball.vy-q.vy)*ny;
-      if(rel < 0){ ball.vx -= 1.9*wBall*rel*nx; ball.vy -= 1.9*wBall*rel*ny; }
-      ball.vx += q.vx*0.20*wBall; ball.vy += q.vy*0.20*wBall;
+      if(rel < 0){
+        // gercek carpisma itkisi: agir topu itmek oyuncuyu de yavaslatir
+        var e = 0.28;                                   // dusuk esneklik = yapiskan his
+        var j = -(1+e)*rel / (1/qm + 1/mb);
+        ball.vx += (j/mb)*nx;  ball.vy += (j/mb)*ny;
+        q.vx    -= (j/qm)*nx;  q.vy    -= (j/qm)*ny;     // oyuncu topa yaslanir
+      }
+      // ITME DIRENCI: agir topu one iterken oyuncu yavaslar (topu surmek efor ister).
+      // Agirlik arttikca direnc artar -> ayarlardan hissedilir sekilde degistirilebilir.
+      var push = q.vx*nx + q.vy*ny;            // oyuncunun topa dogru hiz bileseni
+      if(push > 0){
+        var resist = Math.min(0.62, 0.085 * mb / (qm||1));   // agirlikla olcekli itme direnci   // agirlikla dogrudan olcekli direnc
+        q.vx -= push*resist*nx; q.vy -= push*resist*ny;
+        // itilen top bu enerjinin bir kismini alir (yuvarlanir)
+        ball.vx += push*resist*nx*wB*2.2; ball.vy += push*resist*ny*wB*2.2;
+      }
+      // hafif "surukleme": top oyuncunun hizinin kucuk bir kismini alir (dribbling icin)
+      ball.vx += q.vx*0.08*wB; ball.vy += q.vy*0.08*wB;
       // Dokunus topu tekme gibi firlatmasin: temasin KAZANDIRDIGI hiz sinirli.
       // Zaten hizli gelen top (sut/pas/sekme) asla yavaslatilmaz.
       var qsp = Math.sqrt(q.vx*q.vx + q.vy*q.vy);
@@ -1611,7 +1623,7 @@ function hostOnData(conn, msg){
       if(typeof msg.gs==='number'){ G_SPRINT = Math.min(2, Math.max(0.5, msg.gs)); LOBBY.cfg.gSprint=G_SPRINT; }
       if(typeof msg.gc==='number'){ G_CURVE  = Math.min(3, Math.max(0,   msg.gc)); LOBBY.cfg.gCurve=G_CURVE; }
       if(typeof msg.gk2==='number'){ G_SHOT  = Math.min(2, Math.max(0.5, msg.gk2)); LOBBY.cfg.gShot=G_SHOT; }
-      if(typeof msg.bm==='number'){ BALL_MASS = Math.min(3, Math.max(0.5, msg.bm)); LOBBY.cfg.bMass=BALL_MASS; }
+      if(typeof msg.bm==='number'){ BALL_MASS = Math.min(6, Math.max(0.5, msg.bm)); LOBBY.cfg.bMass=BALL_MASS; }
       if(typeof msg.sp==='number') LOBBY.cfg.spdP = SPD_P;
       if(typeof msg.sb==='number') LOBBY.cfg.spdB = SPD_B;
       saveGameCfg(); pushLobby();
@@ -2086,7 +2098,7 @@ function applyCfgObject(o){
   if(typeof o.gSprint==='number') c.gSprint = clampN(o.gSprint, 0.6, 1.8, 1);
   if(typeof o.gCurve==='number')  c.gCurve  = clampN(o.gCurve, 0, 2.5, 1);
   if(typeof o.gShot==='number')   c.gShot   = clampN(o.gShot, 0.6, 1.8, 1);
-  if(typeof o.bMass==='number')   c.bMass   = clampN(o.bMass, 0.5, 3, 1.45);
+  if(typeof o.bMass==='number')   c.bMass   = clampN(o.bMass, 0.5, 6, 2.2);
   if(typeof o.diff==='number')    c.diff    = Math.max(0, Math.min(4, Math.round(o.diff)));
   applyCfgLocal();
   saveGameCfg();
@@ -2151,14 +2163,14 @@ function loadGameCfg(){
       return {
         spdP: clampN(o.spdP, 0.5, 2, 1), spdB: clampN(o.spdB, 0.5, 2, 1),
         gSprint: clampN(o.gSprint, 0.6, 1.8, 1), gCurve: clampN(o.gCurve, 0, 2.5, 1),
-        gShot: clampN(o.gShot, 0.6, 1.8, 1), bMass: clampN(o.bMass, 0.5, 3, 1.45),
+        gShot: clampN(o.gShot, 0.6, 1.8, 1), bMass: clampN(o.bMass, 0.5, 6, 2.2),
         tc0: cleanCol(o.tc0, DEF_TEAM_COL[0]), tc1: cleanCol(o.tc1, DEF_TEAM_COL[1]),
         diff: Math.max(0, Math.min(4, Math.round(o.diff!=null?o.diff:2))),
         updated: o.updated || 0
       };
     }
   } catch(e){}
-  return { spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:1.45, diff:2, updated:0,
+  return { spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:2.2, diff:2, updated:0,
            tc0:DEF_TEAM_COL[0], tc1:DEF_TEAM_COL[1] };
 }
 function clampN(v, lo, hi, dflt){
@@ -2178,7 +2190,7 @@ function applyCfgObject(o){
   LOBBY.cfg.gSprint = clampN(o.gSprint, 0.6, 1.8, 1);
   LOBBY.cfg.gCurve  = clampN(o.gCurve, 0, 2.5, 1);
   LOBBY.cfg.gShot   = clampN(o.gShot, 0.6, 1.8, 1);
-  LOBBY.cfg.bMass   = clampN(o.bMass, 0.5, 3, 1.45);
+  LOBBY.cfg.bMass   = clampN(o.bMass, 0.5, 6, 2.2);
   LOBBY.cfg.tc0     = cleanCol(o.tc0, DEF_TEAM_COL[0]);
   LOBBY.cfg.tc1     = cleanCol(o.tc1, DEF_TEAM_COL[1]);
   if(o.diff != null) LOBBY.cfg.diff = Math.max(0, Math.min(4, Math.round(o.diff)));
