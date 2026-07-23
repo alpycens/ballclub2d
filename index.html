@@ -194,11 +194,11 @@
     <button id="statReset">Standarda Dön (hepsi 3)</button>
   </div>
   <div id="kitBox">
-    <div class="settitle">FORMA</div>
+    <div class="settitle">FORMA NUMARAM</div>
     <div class="kitRow">
       <label>Numara</label>
       <input id="kitNum" type="number" min="1" max="99" value="10">
-      <div id="kitColors"></div>
+
     </div>
   </div>
   <div class="btnrow">
@@ -246,11 +246,11 @@
     </div>
   </div>
   <div id="lobKit">
-    <div class="settitle" style="font-size:11px;letter-spacing:2px;color:#CDE6B4">FORMAM</div>
+    <div class="settitle" style="font-size:11px;letter-spacing:2px;color:#CDE6B4">FORMA NUMARAM</div>
     <div class="kitRow">
       <label>Numara</label>
       <input id="lkitNum" type="number" min="1" max="99" value="10">
-      <div id="lkitColors"></div>
+
     </div>
   </div>
   <div id="lobStats">
@@ -294,9 +294,9 @@
  <div id="gameScale">
   <div id="topBar">
     <div id="scoreBox">
-      <span class="tdot" style="background:#E56E56"></span><span id="scR">0</span>
+      <span class="tdot" id="dotR" style="background:#E56E56"></span><span id="scR">0</span>
       <span style="color:#6E8089">-</span>
-      <span id="scB">0</span><span class="tdot" style="background:#5689E5"></span>
+      <span id="scB">0</span><span class="tdot" id="dotB" style="background:#5689E5"></span>
       <span id="clock" style="margin-left:14px;font-size:14px;color:#9FB3BB;font-variant-numeric:tabular-nums"></span>
     </div>
     <div id="topRight">
@@ -495,7 +495,7 @@ var ROLE_TR = { gk:'Kaleci', def:'Defans', mid:'Orta Saha', fwd:'Forvet' };
 var matchMins = 0;                                  // 0 = suresiz
 var PEN_W = 114, PEN_EXT = 45;                      // ceza sahasi: derinlik ve kale ustu/alti tasma
 var CIRCLE_R = 70;                                  // orta yuvarlak yaricapi
-var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:1.45, cap0:null, cap1:null }, started:false };
+var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:1.45, tc0:'#E56E56', tc1:'#5689E5', cap0:null, cap1:null }, started:false };
 var DIFF_NAMES = ['Beginner','Intermediate','Advanced','Expert','Master'];
 var DIFFS = [
   { spd:1.00, aimErr:0.46, shootRange:250, sprint:true, sprintDist:120, kcd:560, keepErr:30, press:0, stamMin:45, aimDot:0.10, keepOut:0.20 },
@@ -620,6 +620,8 @@ function applyCfgLocal(){
   G_CURVE  = (typeof LOBBY.cfg.gCurve==='number')  ? LOBBY.cfg.gCurve  : 1;
   G_SHOT   = (typeof LOBBY.cfg.gShot==='number')   ? LOBBY.cfg.gShot   : 1;
   BALL_MASS = (typeof LOBBY.cfg.bMass==='number')  ? LOBBY.cfg.bMass   : 1.45;
+  TEAM_COL[0] = cleanCol(LOBBY.cfg.tc0, DEF_TEAM_COL[0]);
+  TEAM_COL[1] = cleanCol(LOBBY.cfg.tc1, DEF_TEAM_COL[1]);
 }
 
 function resetPositions(){
@@ -1582,6 +1584,11 @@ function hostOnData(conn, msg){
           rosterChanged();
         }
       }
+      else if(msg.a==='tcol' && (msg.team===0||msg.team===1) && captainOf(msg.team)===conn.peer){
+        LOBBY.cfg['tc'+msg.team] = cleanCol(msg.col, DEF_TEAM_COL[msg.team]);
+        TEAM_COL[msg.team] = LOBBY.cfg['tc'+msg.team];
+        saveGameCfg();
+      }
       else if(msg.a==='style' && (msg.team===0||msg.team===1) && captainOf(msg.team)===conn.peer){
         var st=Math.min(2,Math.max(0,Math.round(msg.style)));
         LOBBY.cfg['style'+msg.team]=st; if(LOBBY.started) BOT_STYLE[msg.team]=st;
@@ -1651,11 +1658,11 @@ function broadcast(){
     p: G.players.map(function(p){ return { i:p.id, n:p.name, t:p.team, b:p.bot?1:0,
         x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0,
         fl:(p.flash>0 || p.glow)?1:0, kp:(p.keeper&&p.bot)?1:0, sr:p.spr?1:0,
-        kn:(p.kit&&p.kit.num)||0, kc:(p.kit&&p.kit.color)||'',
+        kn:(p.kit&&p.kit.num)||0,
         ks:p.kickN||0, kw:p.kickPow||0 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
     s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF,BOT_STYLE[0],BOT_STYLE[1],G_SPRINT,G_CURVE,G_SHOT,BALL_MASS],
-    ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam, ck: Math.round(G.clock), mm: matchMins, gn: G.goalN||0 };
+    ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam, ck: Math.round(G.clock), mm: matchMins, gn: G.goalN||0, tc:[TEAM_COL[0],TEAM_COL[1]] };
   for(var k in conns){ try{ conns[k].send(st); }catch(e){} }
 }
 
@@ -1685,6 +1692,7 @@ function startClient(code, attempt){
           if(msg.cf.length>4){ BOT_STYLE=[msg.cf[3],msg.cf[4]]; }
           if(msg.cf.length>7){ G_SPRINT=msg.cf[5]; G_CURVE=msg.cf[6]; G_SHOT=msg.cf[7]; }
           if(msg.cf.length>8){ BALL_MASS=msg.cf[8]; } }
+        if(msg.tc){ TEAM_COL[0]=cleanCol(msg.tc[0], DEF_TEAM_COL[0]); TEAM_COL[1]=cleanCol(msg.tc[1], DEF_TEAM_COL[1]); }
         if(!Gr) Gr = JSON.parse(JSON.stringify(msg));
       }
     });
@@ -1741,11 +1749,11 @@ function loop(now){
         for(var j=0;j<Gr.p.length;j++) if(Gr.p[j].i===tp.i){ rp=Gr.p[j]; break; }
         if(!rp){ Gr.p.push(JSON.parse(JSON.stringify(tp))); continue; }
         rp.x += (tp.x-rp.x)*t; rp.y += (tp.y-rp.y)*t;
-        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fl=tp.fl; rp.kp=tp.kp; rp.sr=tp.sr; rp.kn=tp.kn; rp.kc=tp.kc; rp.ks=tp.ks; rp.kw=tp.kw;
+        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fl=tp.fl; rp.kp=tp.kp; rp.sr=tp.sr; rp.kn=tp.kn; rp.ks=tp.ks; rp.kw=tp.kw;
       }
       Gr.p = Gr.p.filter(function(rp){ return G.p.some(function(tp){return tp.i===rp.i;}); });
       Gr.b[0] += (G.b[0]-Gr.b[0])*t; Gr.b[1] += (G.b[1]-Gr.b[1])*t;
-      Gr.s=G.s; Gr.ph=G.ph; Gr.m=G.m; Gr.pa=G.pa; Gr.ko=G.ko; Gr.kt=G.kt; Gr.ck=G.ck; Gr.mm=G.mm; Gr.gn=G.gn;
+      Gr.s=G.s; Gr.ph=G.ph; Gr.m=G.m; Gr.pa=G.pa; Gr.ko=G.ko; Gr.kt=G.kt; Gr.ck=G.ck; Gr.mm=G.mm; Gr.gn=G.gn; Gr.tc=G.tc;
       render(Gr);
     }
   }
@@ -1753,9 +1761,9 @@ function loop(now){
 }
 
 function hostView(){
-  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0,kp:(p.keeper&&p.bot)?1:0,sr:p.spr?1:0,kn:(p.kit&&p.kit.num)||0,kc:(p.kit&&p.kit.color)||'',ks:p.kickN||0,kw:p.kickPow||0};}),
+  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0,kp:(p.keeper&&p.bot)?1:0,sr:p.spr?1:0,kn:(p.kit&&p.kit.num)||0,ks:p.kickN||0,kw:p.kickPow||0};}),
            b:[G.ball.x,G.ball.y], s:G.score, ph:G.phase, m:G.msg, pa:G.paused?1:0,
-           ko:(G.ko && G.phase==='play')?1:0, kt:G.koTeam, ck:Math.round(G.clock), mm:matchMins, gn:G.goalN||0 };
+           ko:(G.ko && G.phase==='play')?1:0, kt:G.koTeam, ck:Math.round(G.clock), mm:matchMins, gn:G.goalN||0, tc:[TEAM_COL[0],TEAM_COL[1]] };
 }
 
 function kitLum(hex){
@@ -1924,21 +1932,17 @@ function render(v){
       ctx.beginPath(); ctx.arc(p.x,p.y,KICK_RANGE,0,Math.PI*2); ctx.stroke();
       ctx.setLineDash([]);
     }
-    var teamCol = p.t===0 ? '#E56E56' : '#5689E5';
-    var kitCol = p.kc || teamCol;
-    // forma rengi tum daireyi kaplar
-    ctx.fillStyle = kitCol;
+    var teamCol = (v.tc && v.tc[p.t]) ? v.tc[p.t] : TEAM_COL[p.t];
+    // forma rengi (takim rengi) tum daireyi kaplar
+    ctx.fillStyle = teamCol;
     ctx.beginPath(); ctx.arc(p.x,p.y,PR,0,Math.PI*2); ctx.fill();
-    // takim rengi: en distaki ince cember (forma rengini kirpmaz)
-    ctx.strokeStyle = teamCol; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(p.x,p.y,PR-1.25,0,Math.PI*2); ctx.stroke();
     // dis kontur
     ctx.strokeStyle = flash ? '#FFFFFF' : '#1B2125';
     ctx.lineWidth = flash ? 3 : 1.6;
     ctx.beginPath(); ctx.arc(p.x,p.y,PR+0.2,0,Math.PI*2); ctx.stroke();
     // forma numarasi
     if(p.kn){
-      var lum = kitLum(kitCol);
+      var lum = kitLum(teamCol);
       ctx.fillStyle = lum > 0.6 ? '#1B2125' : '#FFFFFF';
       ctx.font = 'bold 12px Segoe UI, Arial';
       ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -1985,6 +1989,11 @@ function render(v){
   }
   // HUD
   el('scR').textContent=v.s[0]; el('scB').textContent=v.s[1];
+  var dots = document.querySelectorAll ? null : null;
+  var tcs = (v.tc && v.tc.length===2) ? v.tc : TEAM_COL;
+  var d0 = el('dotR'), d1 = el('dotB');
+  if(d0) d0.style.background = tcs[0];
+  if(d1) d1.style.background = tcs[1];
   var clk=el('clock');
   if(clk){
     if(v.mm>0){ var rem=Math.max(0, v.mm*60000-(v.ck||0)); clk.textContent=fmtTime(rem); clk.style.color = rem<15000?'#E56E56':'#9FB3BB'; }
@@ -2020,7 +2029,12 @@ var myStats = loadStats();
 
 /* Forma: numara + renk. Renk oyuncunun ic dolgusu olur,
    takim rengi kalin cerceve olarak kalir (takimlar karismaz). */
-var KIT_COLORS = ['#E56E56','#5689E5','#E5B356','#5FBF6B','#B06FD8','#3FC3C9','#EDEDED','#2E3439'];
+var KIT_COLORS = ['#E56E56','#5689E5','#E5B356','#5FBF6B','#B06FD8','#3FC3C9','#EDEDED','#2E3439','#D8452F','#2C5FBF'];
+var DEF_TEAM_COL = ['#E56E56', '#5689E5'];
+var TEAM_COL = ['#E56E56', '#5689E5'];      // aktif takim formalari (lobiden secilir)
+function cleanCol(c, dflt){
+  return (typeof c==='string' && KIT_COLORS.indexOf(c)>=0) ? c : dflt;
+}
 var KKEY = 'bc2d_kit';
 function loadKit(){
   try {
@@ -2032,8 +2046,7 @@ function loadKit(){
 function cleanKit(o){
   var n = (o && typeof o.num==='number') ? Math.round(o.num) : 10;
   n = Math.max(1, Math.min(99, n));
-  var c = (o && typeof o.color==='string' && KIT_COLORS.indexOf(o.color)>=0) ? o.color : null;
-  return { num:n, color:c };
+  return { num:n };
 }
 function saveKit(){ try { localStorage.setItem(KKEY, JSON.stringify(myKit)); } catch(e){} }
 var myKit = loadKit();
@@ -2138,12 +2151,14 @@ function loadGameCfg(){
         spdP: clampN(o.spdP, 0.5, 2, 1), spdB: clampN(o.spdB, 0.5, 2, 1),
         gSprint: clampN(o.gSprint, 0.6, 1.8, 1), gCurve: clampN(o.gCurve, 0, 2.5, 1),
         gShot: clampN(o.gShot, 0.6, 1.8, 1), bMass: clampN(o.bMass, 0.5, 3, 1.45),
+        tc0: cleanCol(o.tc0, DEF_TEAM_COL[0]), tc1: cleanCol(o.tc1, DEF_TEAM_COL[1]),
         diff: Math.max(0, Math.min(4, Math.round(o.diff!=null?o.diff:2))),
         updated: o.updated || 0
       };
     }
   } catch(e){}
-  return { spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:1.45, diff:2, updated:0 };
+  return { spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:1.45, diff:2, updated:0,
+           tc0:DEF_TEAM_COL[0], tc1:DEF_TEAM_COL[1] };
 }
 function clampN(v, lo, hi, dflt){
   if(typeof v !== 'number' || isNaN(v)) return dflt;
@@ -2163,6 +2178,8 @@ function applyCfgObject(o){
   LOBBY.cfg.gCurve  = clampN(o.gCurve, 0, 2.5, 1);
   LOBBY.cfg.gShot   = clampN(o.gShot, 0.6, 1.8, 1);
   LOBBY.cfg.bMass   = clampN(o.bMass, 0.5, 3, 1.45);
+  LOBBY.cfg.tc0     = cleanCol(o.tc0, DEF_TEAM_COL[0]);
+  LOBBY.cfg.tc1     = cleanCol(o.tc1, DEF_TEAM_COL[1]);
   if(o.diff != null) LOBBY.cfg.diff = Math.max(0, Math.min(4, Math.round(o.diff)));
   if(o.botStats){ BOT_STATS = cleanBotStatsTable(o.botStats); saveBotStats(); if(typeof renderBotStatRows==='function') renderBotStatRows(); refreshBotsLive(); }
   applyCfgLocal();
@@ -2206,6 +2223,7 @@ function exportGameCfg(){
     spdP: LOBBY.cfg.spdP, spdB: LOBBY.cfg.spdB,
     gSprint: LOBBY.cfg.gSprint, gCurve: LOBBY.cfg.gCurve, gShot: LOBBY.cfg.gShot,
     bMass: LOBBY.cfg.bMass, diff: LOBBY.cfg.diff,
+    tc0: LOBBY.cfg.tc0, tc1: LOBBY.cfg.tc1,
     botStats: BOT_STATS
   };
   var txt = JSON.stringify(o, null, 2);
@@ -2226,7 +2244,7 @@ function saveGameCfg(){
     localStorage.setItem(GKEY, JSON.stringify({
       spdP: LOBBY.cfg.spdP, spdB: LOBBY.cfg.spdB, gSprint: LOBBY.cfg.gSprint,
       gCurve: LOBBY.cfg.gCurve, gShot: LOBBY.cfg.gShot, bMass: LOBBY.cfg.bMass, diff: LOBBY.cfg.diff,
-      updated: Date.now()
+      tc0: LOBBY.cfg.tc0, tc1: LOBBY.cfg.tc1, updated: Date.now()
     }));
   } catch(e){}
 }
@@ -2352,26 +2370,21 @@ function renderKitUI(){
   buildKitUI('lkitNum', 'lkitColors');
 }
 function buildKitUI(numId, colId){
-  var ni = el(numId), cc = el(colId);
+  var ni = el(numId);
   if(ni){ ni.value = myKit.num; }
-  if(!cc) return;
-  cc.innerHTML = '';
-  KIT_COLORS.forEach(function(col){
-    var b = document.createElement('button');
-    b.className = 'kitSw' + ((myKit.color===col) ? ' sel' : '');
-    b.style.background = col;
-    b.title = 'Forma rengi';
-    b.onclick = function(){ myKit.color = col; saveKit(); renderKitUI(); pushMyKit(); };
-    cc.appendChild(b);
-  });
-  var d = document.createElement('button');
-  d.className = 'kitSw' + (myKit.color===null ? ' sel' : '');
-  d.style.background = 'transparent';
-  d.textContent = '×';
-  d.style.color = '#9FB3BB'; d.style.fontSize = '12px'; d.style.lineHeight = '1';
-  d.title = 'Takım rengi (varsayılan)';
-  d.onclick = function(){ myKit.color = null; saveKit(); renderKitUI(); pushMyKit(); };
-  cc.appendChild(d);
+}
+
+// Takim formasi rengi: her takimin kaptani kendi takiminin rengini secer
+function setTeamColor(team, col){
+  if(role==='host'){
+    if(iAmCaptain(team)){
+      LOBBY.cfg['tc'+team] = cleanCol(col, DEF_TEAM_COL[team]);
+      TEAM_COL[team] = LOBBY.cfg['tc'+team];
+      saveGameCfg(); pushLobby(); renderLobby();
+    }
+  } else if(hostConn && hostConn.open){
+    hostConn.send({t:'lreq', a:'tcol', team:team, col:col});
+  }
 }
 
 /* ================= LOBİ ================= */
@@ -2412,11 +2425,17 @@ function rosterChanged(){
 
 function renderLobby(){
   var cols = { 0:el('colRed'), 1:el('colBlue'), 2:el('colSpec') };
+  var hdrs = document.querySelectorAll ? document.querySelectorAll('.lobColHead') : [];
+  if(hdrs && hdrs.length>=2){
+    if(hdrs[0]) hdrs[0].style.color = LOBBY.cfg.tc0 || DEF_TEAM_COL[0];
+    if(hdrs[2]) hdrs[2].style.color = LOBBY.cfg.tc1 || DEF_TEAM_COL[1];
+  }
   cols[0].innerHTML=''; cols[1].innerHTML=''; cols[2].innerHTML='';
   LOBBY.roster.forEach(function(s){
     var row = document.createElement('div');
     row.className = 'lobSlot' + (s.id===myPid?' me':'');
     var nm = document.createElement('span'); nm.className='nm'; nm.textContent = (s.bot?'🤖 ':'')+s.name;
+    if(s.team===0 || s.team===1) nm.style.color = (s.team===0 ? (LOBBY.cfg.tc0||DEF_TEAM_COL[0]) : (LOBBY.cfg.tc1||DEF_TEAM_COL[1]));
     row.appendChild(nm);
     if(s.team===0||s.team===1){
       if(!s.bot){
@@ -2446,6 +2465,31 @@ function renderLobby(){
     }
     (cols[s.team]||cols[2]).appendChild(row);
   });
+  // takim forma rengi (kaptan secer)
+  [0,1].forEach(function(team){
+    var colEl = team===0 ? el('colRed') : el('colBlue');
+    var capC = iAmCaptain(team);
+    var wrapC = document.createElement('div');
+    wrapC.style.cssText = 'margin-top:8px;display:flex;flex-direction:column;gap:4px';
+    var labC = document.createElement('label');
+    labC.style.cssText = 'font-size:11px;color:#9FB3BB';
+    labC.textContent = 'Forma rengi' + (capC ? ' (kaptan)' : '');
+    var sw = document.createElement('div');
+    sw.style.cssText = 'display:flex;gap:5px;flex-wrap:wrap';
+    var cur = (team===0 ? LOBBY.cfg.tc0 : LOBBY.cfg.tc1) || DEF_TEAM_COL[team];
+    KIT_COLORS.forEach(function(c){
+      var b = document.createElement('button');
+      b.className = 'kitSw' + (cur===c ? ' sel' : '');
+      b.style.background = c;
+      b.disabled = !capC;
+      b.title = capC ? 'Takım formasını seç' : 'Sadece kaptan değiştirir';
+      b.onclick = function(){ setTeamColor(team, c); };
+      sw.appendChild(b);
+    });
+    wrapC.appendChild(labC); wrapC.appendChild(sw);
+    colEl.appendChild(wrapC);
+  });
+
   // takim bazli bot tarzi secici (kaptan ayarlar)
   [0,1].forEach(function(team){
     var col = team===0 ? el('colRed') : el('colBlue');
@@ -2811,7 +2855,8 @@ function initLobbyHost(){
   var gc0 = loadGameCfg();   // daha once kaydettigim ayarlar her yeni odada gecerli
   LOBBY.cfg = { field:'big', goals:3, style0:1, style1:1, mins:0, cap0:null, cap1:null,
                 spdP:gc0.spdP, spdB:gc0.spdB, gSprint:gc0.gSprint, gCurve:gc0.gCurve,
-                gShot:gc0.gShot, bMass:gc0.bMass, diff:gc0.diff };
+                gShot:gc0.gShot, bMass:gc0.bMass, diff:gc0.diff,
+                tc0:gc0.tc0, tc1:gc0.tc1 };
   applyCfgLocal();
   LOBBY.started = false;
   applyCfgLocal();
