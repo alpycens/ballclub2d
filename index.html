@@ -243,12 +243,6 @@
       <div class="cfgItem hostOnly"><label>Süre</label>
         <select id="lminSel"><option value="0" selected>Süresiz</option><option value="1">1 dk</option><option value="2">2 dk</option><option value="3">3 dk</option><option value="5">5 dk</option></select>
       </div>
-      <div class="cfgItem hostOnly"><label>Oyuncu hızı: <span id="lpspdVal">100%</span></label>
-        <input type="range" id="lpspdInp" min="50" max="200" step="10" value="100" style="width:120px">
-      </div>
-      <div class="cfgItem hostOnly"><label>Top hızı: <span id="lbspdVal">100%</span></label>
-        <input type="range" id="lbspdInp" min="50" max="200" step="10" value="100" style="width:120px">
-      </div>
       <button class="hostOnly" id="lobStart">Maçı Başlat</button>
       <button class="hostOnly" id="endMatchBtn" style="display:none;padding:10px 20px;font-size:14px;font-weight:700;background:#7A3C3C">Maçı Bitir</button>
       <button id="backToGameBtn" style="display:none;padding:10px 26px;font-size:15px;font-weight:700;background:#4C5E68">Oyuna Dön</button>
@@ -306,6 +300,8 @@
       <input type="range" id="ggcInp" min="0" max="250" step="10" value="100">
       <label>Şut gücü (herkes): <span id="ggkVal">100%</span></label>
       <input type="range" id="ggkInp" min="60" max="180" step="10" value="100">
+      <label>Top ağırlığı: <span id="gbmVal">145%</span></label>
+      <input type="range" id="gbmInp" min="50" max="300" step="5" value="145">
       <label>Bot zorluğu</label>
       <select id="gdSel" style="width:100%;padding:7px 9px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:13px">
         <option value="0">Beginner</option>
@@ -387,7 +383,7 @@ var ROLE_TR = { gk:'Kaleci', def:'Defans', mid:'Orta Saha', fwd:'Forvet' };
 var matchMins = 0;                                  // 0 = suresiz
 var PEN_W = 114, PEN_EXT = 45;                      // ceza sahasi: derinlik ve kale ustu/alti tasma
 var CIRCLE_R = 70;                                  // orta yuvarlak yaricapi
-var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, cap0:null, cap1:null }, started:false };
+var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:1.45, cap0:null, cap1:null }, started:false };
 var DIFF_NAMES = ['Beginner','Intermediate','Advanced','Expert','Master'];
 var DIFFS = [
   { spd:1.00, aimErr:0.46, shootRange:250, sprint:true, sprintDist:120, kcd:560, keepErr:30, press:0, stamMin:45, aimDot:0.10, keepOut:0.20 },
@@ -509,6 +505,7 @@ function applyCfgLocal(){
   G_SPRINT = (typeof LOBBY.cfg.gSprint==='number') ? LOBBY.cfg.gSprint : 1;
   G_CURVE  = (typeof LOBBY.cfg.gCurve==='number')  ? LOBBY.cfg.gCurve  : 1;
   G_SHOT   = (typeof LOBBY.cfg.gShot==='number')   ? LOBBY.cfg.gShot   : 1;
+  BALL_MASS = (typeof LOBBY.cfg.bMass==='number')  ? LOBBY.cfg.bMass   : 1.45;
 }
 
 function resetPositions(){
@@ -1426,6 +1423,10 @@ function hostOnData(conn, msg){
       if(typeof msg.gs==='number'){ G_SPRINT = Math.min(2, Math.max(0.5, msg.gs)); LOBBY.cfg.gSprint=G_SPRINT; }
       if(typeof msg.gc==='number'){ G_CURVE  = Math.min(3, Math.max(0,   msg.gc)); LOBBY.cfg.gCurve=G_CURVE; }
       if(typeof msg.gk2==='number'){ G_SHOT  = Math.min(2, Math.max(0.5, msg.gk2)); LOBBY.cfg.gShot=G_SHOT; }
+      if(typeof msg.bm==='number'){ BALL_MASS = Math.min(3, Math.max(0.5, msg.bm)); LOBBY.cfg.bMass=BALL_MASS; }
+      if(typeof msg.sp==='number') LOBBY.cfg.spdP = SPD_P;
+      if(typeof msg.sb==='number') LOBBY.cfg.spdB = SPD_B;
+      saveGameCfg(); pushLobby();
       if(msg.tp) G.paused = !G.paused;
     }
   } else if(msg.t==='chat'){
@@ -1471,7 +1472,7 @@ function broadcast(){
         x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0,
         fl:(p.flash>0 || p.glow)?1:0, kp:(p.keeper&&p.bot)?1:0, sr:p.spr?1:0 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
-    s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF,BOT_STYLE[0],BOT_STYLE[1],G_SPRINT,G_CURVE,G_SHOT],
+    s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF,BOT_STYLE[0],BOT_STYLE[1],G_SPRINT,G_CURVE,G_SHOT,BALL_MASS],
     ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam, ck: Math.round(G.clock), mm: matchMins };
   for(var k in conns){ try{ conns[k].send(st); }catch(e){} }
 }
@@ -1500,7 +1501,8 @@ function startClient(code, attempt){
         G = msg;
         if(msg.cf){ SPD_P=msg.cf[0]; SPD_B=msg.cf[1]; if(msg.cf.length>2) BOT_DIFF=msg.cf[2];
           if(msg.cf.length>4){ BOT_STYLE=[msg.cf[3],msg.cf[4]]; }
-          if(msg.cf.length>7){ G_SPRINT=msg.cf[5]; G_CURVE=msg.cf[6]; G_SHOT=msg.cf[7]; } }
+          if(msg.cf.length>7){ G_SPRINT=msg.cf[5]; G_CURVE=msg.cf[6]; G_SHOT=msg.cf[7]; }
+          if(msg.cf.length>8){ BALL_MASS=msg.cf[8]; } }
         if(!Gr) Gr = JSON.parse(JSON.stringify(msg));
       }
     });
@@ -1698,6 +1700,37 @@ function drawGoal(x, dir){
 
 /* ================= KARAKTER STATLARI ================= */
 var myStats = loadStats();
+
+/* Global oyun ayarlari: host degistirince kaydedilir, kurdugu HER odada
+   gecerli olur ve odaya giren HERKESE otomatik uygulanir. */
+var GKEY = 'bc2d_gamecfg';
+function loadGameCfg(){
+  try {
+    var s = localStorage.getItem(GKEY);
+    if(s){
+      var o = JSON.parse(s);
+      return {
+        spdP: clampN(o.spdP, 0.5, 2, 1), spdB: clampN(o.spdB, 0.5, 2, 1),
+        gSprint: clampN(o.gSprint, 0.6, 1.8, 1), gCurve: clampN(o.gCurve, 0, 2.5, 1),
+        gShot: clampN(o.gShot, 0.6, 1.8, 1), bMass: clampN(o.bMass, 0.5, 3, 1.45),
+        diff: Math.max(0, Math.min(4, Math.round(o.diff!=null?o.diff:2)))
+      };
+    }
+  } catch(e){}
+  return { spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, bMass:1.45, diff:2 };
+}
+function clampN(v, lo, hi, dflt){
+  if(typeof v !== 'number' || isNaN(v)) return dflt;
+  return Math.max(lo, Math.min(hi, v));
+}
+function saveGameCfg(){
+  try {
+    localStorage.setItem(GKEY, JSON.stringify({
+      spdP: LOBBY.cfg.spdP, spdB: LOBBY.cfg.spdB, gSprint: LOBBY.cfg.gSprint,
+      gCurve: LOBBY.cfg.gCurve, gShot: LOBBY.cfg.gShot, bMass: LOBBY.cfg.bMass, diff: LOBBY.cfg.diff
+    }));
+  } catch(e){}
+}
 function loadStats(){
   try {
     var s = localStorage.getItem('bc2d_stats');
@@ -1887,8 +1920,6 @@ function syncLobCfg(){
   el('lgoalSel').value = ''+LOBBY.cfg.goals;
   el('lminSel').value = ''+(LOBBY.cfg.mins||0);
   var sp=Math.round((LOBBY.cfg.spdP||1)*100), sb=Math.round((LOBBY.cfg.spdB||1)*100);
-  el('lpspdInp').value=sp; el('lpspdVal').textContent=sp+'%';
-  el('lbspdInp').value=sb; el('lbspdVal').textContent=sb+'%';
 }
 
 function pushLobby(){
@@ -2179,7 +2210,11 @@ function readMenu(){
 
 function initLobbyHost(){
   LOBBY.roster = [{ id:'host', name:myName, team:0, pos:'mid', bot:false, stats:cleanStats(myStats) }];
-  LOBBY.cfg = { field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, cap0:null, cap1:null };
+  var gc0 = loadGameCfg();   // daha once kaydettigim ayarlar her yeni odada gecerli
+  LOBBY.cfg = { field:'big', goals:3, style0:1, style1:1, mins:0, cap0:null, cap1:null,
+                spdP:gc0.spdP, spdB:gc0.spdB, gSprint:gc0.gSprint, gCurve:gc0.gCurve,
+                gShot:gc0.gShot, bMass:gc0.bMass, diff:gc0.diff };
+  applyCfgLocal();
   LOBBY.started = false;
   applyCfgLocal();
 }
@@ -2225,11 +2260,16 @@ el('addRedBtn').onclick = function(){ addBot(0); };
 el('addBlueBtn').onclick = function(){ addBot(1); };
 el('posSel').onchange = function(){ setMyPos(this.value); };
 el('lfieldSel').onchange = function(){ setCfg('field', this.value); };
-el('ldiffSel').onchange = function(){ setCfg('diff', parseInt(this.value,10)); };
+el('ldiffSel').onchange = function(){
+  var v = parseInt(this.value,10);
+  if(role!=='host') return;
+  BOT_DIFF = Math.max(0, Math.min(4, v));      // mac sürerken bile aninda gecerli
+  setCfg('diff', BOT_DIFF);
+  saveGameCfg();
+  var gd = el('gdSel'); if(gd) gd.value = ''+BOT_DIFF;   // ayarlar paneliyle senkron
+};
 el('lgoalSel').onchange = function(){ setCfg('goals', parseInt(this.value,10)); };
 el('lminSel').onchange = function(){ setCfg('mins', parseInt(this.value,10)); };
-el('lpspdInp').oninput = function(){ var v=parseInt(this.value,10); el('lpspdVal').textContent=v+'%'; if(role==='host'){ SPD_P=v/100; setCfg('spdP', v/100); } };
-el('lbspdInp').oninput = function(){ var v=parseInt(this.value,10); el('lbspdVal').textContent=v+'%'; if(role==='host'){ SPD_B=v/100; setCfg('spdB', v/100); } };
 el('lobStart').onclick = startMatch;
 el('lstatReset').onclick = function(){
   if(statsLocked()) return;
@@ -2332,6 +2372,8 @@ function syncPanel(){
   el('ggsInp').value=gs; el('ggsVal').textContent=gs+'%';
   el('ggcInp').value=gc; el('ggcVal').textContent=gc+'%';
   el('ggkInp').value=gk; el('ggkVal').textContent=gk+'%';
+  var bm2 = Math.round(BALL_MASS*100);
+  el('gbmInp').value=bm2; el('gbmVal').textContent=bm2+'%';
 }
 
 el('pwBtn').onclick = function(){
@@ -2355,14 +2397,19 @@ function applyLive(){
   var gs = parseInt(el('ggsInp').value,10)/100;
   var gc = parseInt(el('ggcInp').value,10)/100;
   var gk = parseInt(el('ggkInp').value,10)/100;
+  var bm = parseInt(el('gbmInp').value,10)/100;
+  el('gbmVal').textContent = Math.round(bm*100)+'%';
   el('ggsVal').textContent = Math.round(gs*100)+'%';
   el('ggcVal').textContent = Math.round(gc*100)+'%';
   el('ggkVal').textContent = Math.round(gk*100)+'%';
   if(role==='host'){
-    SPD_P=sp; SPD_B=sb; BOT_DIFF=bd; G_SPRINT=gs; G_CURVE=gc; G_SHOT=gk;
+    SPD_P=sp; SPD_B=sb; BOT_DIFF=bd; G_SPRINT=gs; G_CURVE=gc; G_SHOT=gk; BALL_MASS=bm;
+    LOBBY.cfg.spdP=sp; LOBBY.cfg.spdB=sb; LOBBY.cfg.bMass=bm;
     LOBBY.cfg.diff=bd; LOBBY.cfg.gSprint=gs; LOBBY.cfg.gCurve=gc; LOBBY.cfg.gShot=gk;
+    saveGameCfg();     // her yeni odada da gecerli olsun
+    pushLobby();       // lobideki herkese aninda bildir
   }
-  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, bd:bd, gs:gs, gc:gc, gk2:gk}); }
+  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, bd:bd, gs:gs, gc:gc, gk2:gk, bm:bm}); }
 }
 el('gpInp').oninput = applyLive;
 el('gbInp').oninput = applyLive;
@@ -2370,6 +2417,7 @@ el('gdSel').onchange = applyLive;
 el('ggsInp').oninput = applyLive;
 el('ggcInp').oninput = applyLive;
 el('ggkInp').oninput = applyLive;
+el('gbmInp').oninput = applyLive;
 
 el('pauseBtn2').onclick = function(){
   if(role==='host'){ G.paused = !G.paused; }
