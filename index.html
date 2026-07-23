@@ -662,7 +662,6 @@ function resetPositions(){
   G.ball.x = W/2; G.ball.y = H/2; G.ball.vx = 0; G.ball.vy = 0;
   G.ball.cw = null; G.ball.ct = 0; G.ball.cd = null; G.ball.spin = 0; G.ball.kickGrace = 0;
   G.ko = true;
-  G.koTimer = 7000;   // vurulmazsa kisit otomatik kalkar
   for(var t=0;t<2;t++){
     var team = G.players.filter(function(p){return p.team===t;});
     var groups = { def:[], mid:[], fwd:[] };
@@ -716,20 +715,20 @@ function enforceKickoffZones(){
   for(var i=0;i<G.players.length;i++){
     var p = G.players[i];
     if(p.team === G.koTeam) continue;
+    // 1) orta cizgi: duz duvar gibi, sadece ileri hizi sifirlanir (tegetsel kayma serbest)
     if(p.team===0){ var l0 = W/2-(PR+4); if(p.x > l0){ p.x = l0; if(p.vx>0) p.vx = 0; } }
     else { var l1 = W/2+(PR+4); if(p.x < l1){ p.x = l1; if(p.vx<0) p.vx = 0; } }
+    // 2) orta yuvarlak: DIKEY kacis kullan. Radyal itme oyuncuyu orta cizgiye geri
+    //    savuruyordu (iki kisit birbiriyle cakisip "geri atma" hissi veriyordu).
     var dx = p.x-W/2, dy = p.y-H/2;
-    var d = Math.sqrt(dx*dx+dy*dy);
     var lim = CIRCLE_R + PR;
-    if(d < lim){
-      if(d < 0.001){ dx = (p.team===0?-1:1); dy = 0; d = 1; }
-      var nx = dx/d, ny = dy/d;
-      p.x = W/2 + nx*lim;
-      p.y = H/2 + ny*lim;
-      var vn = p.vx*nx + p.vy*ny;
-      if(vn < 0){ p.vx -= vn*nx; p.vy -= vn*ny; }
-      if(p.team===0 && p.x > W/2-(PR+4)) p.x = W/2-(PR+4);
-      if(p.team===1 && p.x < W/2+(PR+4)) p.x = W/2+(PR+4);
+    if(dx*dx + dy*dy < lim*lim){
+      var need = Math.sqrt(Math.max(0, lim*lim - dx*dx));   // bu x'te cemberden cikis mesafesi
+      var sgn = (dy >= 0) ? 1 : -1;
+      p.y = H/2 + sgn*need;
+      if(sgn > 0 && p.vy < 0) p.vy = 0;                     // cembere dogru olan dikey hiz sifir
+      if(sgn < 0 && p.vy > 0) p.vy = 0;
+      p.y = Math.max(PY0+PR, Math.min(PY1-PR, p.y));
     }
   }
 }
@@ -759,9 +758,10 @@ function resolveBallPlayers(nearWall){
       var rel = (ball.vx-q.vx)*nx + (ball.vy-q.vy)*ny;
 
       // 1) SERT GELEN TOP (sut/pas/sekme): oyuncu engel gibi davranir -> top seker.
-      //    Olcut topun mutlak hizi DEGIL, YAKLASMA hizidir; boylece yavas yuvarlanan
-      //    topa dokununca sekme yasanmaz (yapisma korunur).
-      if(rel < -2.0){
+      //    Olcut TOPUN oyuncuya dogru hizidir. Boylece topa dogru KOSMAK sekme
+      //    yaratmaz (yapisma korunur); sadece uzerine gelen sut seker.
+      var ballToward = -(ball.vx*nx + ball.vy*ny);
+      if(ballToward > 2.0){
         var e = 0.62;
         ball.vx -= (1+e)*rel*nx;  ball.vy -= (1+e)*rel*ny;
         var kick = Math.min(0.35, (-rel) * (mb/(qm+mb)) * 0.10);   // cok hafif geri tepme
@@ -859,10 +859,7 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
   var play = (G.phase==='play');
   G.t += dt;
   if(G.ball.kickGrace > 0) G.ball.kickGrace = Math.max(0, G.ball.kickGrace - dt*TICK_MS);
-  if(play && G.ko){
-    G.koTimer = (G.koTimer==null ? 7000 : G.koTimer) - dt*TICK_MS;
-    if(G.koTimer <= 0) G.ko = false;      // kimse baslama vurusunu yapmadi: oyun akmaya devam etsin
-  }
+
   if(play){
     G.clock += dt*TICK_MS;
     if(matchMins>0 && G.clock >= matchMins*60000){ endMatchByTime(); }
