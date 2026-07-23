@@ -376,7 +376,7 @@
   <canvas id="cv" width="1000" height="520"></canvas>
   <div id="botBar">
     <div id="stamWrap">SPRINT <div id="stamOuter"><div id="stamFill"></div></div></div>
-    <div id="ctrlHint">WASD/Yön: hareket · X: pas · Z: falsolu pas · Space: şut · C: falsolu şut · Alt: ara pas · Shift: sprint · V: baskı</div>
+    <div id="ctrlHint">WASD/Yön: hareket · X: pas · Z: falsolu pas · Space: şut · C: falsolu şut · Alt: topa git · Shift: sprint · V: baskı</div>
     <button id="leaveBtn">Menüye Dön</button>
   </div>
   <div id="chatWrap">
@@ -585,7 +585,7 @@ function penBox(t){
 function newPlayer(id, name, team, bot, stats){
   var np = { id:id, name:name, team:team, bot:bot,
            x:0, y:0, vx:0, vy:0,
-           stamina:STAM_MAX, lock:false, kcd:0, passReq:0, shootReq:0, thruReq:0, cpassReq:0, cshootReq:0, pressReq:0, flash:0, keeper:false, throughKick:false, kickN:0, kickPow:0,
+           stamina:STAM_MAX, lock:false, kcd:0, passReq:0, shootReq:0, callReq:0, cpassReq:0, cshootReq:0, pressReq:0, flash:0, keeper:false, throughKick:false, kickN:0, kickPow:0,
            stats:null, fShot:1, fCurve:1, fSprint:1, fDrib:1, mass:1,
            in:{u:0,d:0,l:0,r:0,s:0}, ev:[] };
   applyStats(np, stats);
@@ -645,6 +645,22 @@ function resetPositions(){
         p.vx = 0; p.vy = 0;
       });
     });
+    // baslama vurusunu YAPAN takim: cemberde serbest ama TOPUN USTUNDE spawn olmasin
+    if(t === G.koTeam){
+      team.forEach(function(p){
+        if(p.keeper) return;
+        var sdx = p.x-W/2, sdy = p.y-H/2;
+        var sd = Math.sqrt(sdx*sdx+sdy*sdy);
+        var minSpawn = PR + BR + 34;                 // topa istemsiz degmeyecek mesafe
+        if(sd < minSpawn){
+          if(sd < 0.001){ sdx = (t===0 ? -1 : 1); sdy = 0; sd = 1; }   // kendi kalesine dogru geri
+          p.x = W/2 + (sdx/sd)*minSpawn;
+          p.y = H/2 + (sdy/sd)*minSpawn;
+          p.x = Math.max(PX0+PR, Math.min(PX1-PR, p.x));
+          p.y = Math.max(PY0+PR, Math.min(PY1-PR, p.y));
+        }
+      });
+    }
     // baslama vurusunu YAPMAYAN takim ilk kareden itibaren cemberin disinda ve kendi yarisinda
     if(t !== G.koTeam){
       team.forEach(function(p){
@@ -830,7 +846,7 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     p.kcd = Math.max(0, p.kcd - dt*TICK_MS);
     p.passReq = Math.max(0, p.passReq - dt*TICK_MS);
     p.shootReq = Math.max(0, p.shootReq - dt*TICK_MS);
-    p.thruReq = Math.max(0, p.thruReq - dt*TICK_MS);
+    p.callReq = Math.max(0, p.callReq - dt*TICK_MS);
     p.cpassReq = Math.max(0, p.cpassReq - dt*TICK_MS);
     p.cshootReq = Math.max(0, p.cshootReq - dt*TICK_MS);
     p.pressReq = Math.max(0, p.pressReq - dt*TICK_MS);
@@ -936,7 +952,7 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
       } else if(e==='pass'){
         if(!tryKick(p, 'pass')) { p.passReq = 1300; p.shootReq = 0; }   // topsuzsa bottan pas iste
       } else if(e==='through'){
-        if(!tryKick(p, 'pass')) { p.thruReq = 1300; p.passReq = 0; p.shootReq = 0; }   // ara pas iste
+        p.callReq = 2500;      // Alt: takim botlari topa gitsin
       } else if(e==='cpass'){
         if(!tryKick(p, 'cpass')) { p.cpassReq = 1300; p.passReq=0; p.shootReq=0; p.cshootReq=0; }
       } else if(e==='cshoot'){
@@ -1161,10 +1177,11 @@ function botThink(){
       if(!team[hi].bot && dist(team[hi], ball) < KICK_RANGE + 14){ humanHolder = team[hi]; break; }
     }
     // takim komutu: V = baski yap
-    var pressOrder = false;
+    var pressOrder = false, callOrder = false;
     for(var ro=0; ro<team.length; ro++){
       if(team[ro].bot) continue;
       if(team[ro].pressReq > 0) pressOrder = true;
+      if(team[ro].callReq > 0) callOrder = true;     // Alt: topa git
     }
     // insan komutu: X = bana pas, Space = kaleye sut
     var cmdPlayer = null, cmdType = null;
@@ -1174,7 +1191,6 @@ function botThink(){
       if(hp.passReq > 0){ cmdPlayer = hp; cmdType = 'pass'; break; }
       if(hp.cpassReq > 0){ cmdPlayer = hp; cmdType = 'cpass'; break; }
       if(hp.cshootReq > 0){ cmdPlayer = hp; cmdType = 'cshoot'; break; }
-      if(hp.thruReq > 0){ cmdPlayer = hp; cmdType = 'through'; break; }
       if(hp.shootReq > 0){ cmdPlayer = hp; cmdType = 'shoot'; break; }
     }
     var chaser=null, bd=1e9;
@@ -1235,11 +1251,11 @@ function botThink(){
         var req = (cmdPlayer && cmdPlayer!==p) ? cmdPlayer : null;
         if(p===keeper){
           var kax = t===0 ? W*0.72 : W*0.28, kay = PY0 + rnd(0.25,0.75)*(PY1-PY0);
-          if(req && (cmdType==='pass'||cmdType==='through'||cmdType==='cpass')){ kax=req.x; kay=req.y; }
+          if(req && (cmdType==='pass'||cmdType==='cpass')){ kax=req.x; kay=req.y; }
           else if(req && (cmdType==='shoot'||cmdType==='cshoot')){ kax=gx; kay=gy; }
           if(!botKick(p, kax, kay, req?PASS_SPD:SHOOT_SPD, -1)){    // kaleci her yonden temizler
             moveBot(p, lineupSpot(kax,kay).x, lineupSpot(kax,kay).y, false);
-          } else if(req){ req.passReq=0; req.shootReq=0; req.thruReq=0; req.cpassReq=0; req.cshootReq=0; }
+          } else if(req){ req.passReq=0; req.shootReq=0; req.cpassReq=0; req.cshootReq=0; }
           slot++;
           continue;
         }
@@ -1251,18 +1267,8 @@ function botThink(){
             if(cmdType==='cshoot') p.throughKick = true;      // falsolu sut emri
           }
           else if(cmdType==='cpass'){ tax=req.x; tay=req.y; tspd=PASS_SPD; p.throughKick = true; }
-          else if(cmdType==='through'){
-            // ARA PAS: oyuncunun ONUNE, bosluga at (kosarak yetissin) - falso serbest
-            var lead = 150 + (t===0 ? 1 : -1) * 0;
-            tax = req.x + (t===0 ? lead : -lead);
-            tay = req.y + (req.vy||0) * 22;
-            tax = Math.max(PX0+25, Math.min(PX1-25, tax));
-            tay = Math.max(PY0+25, Math.min(PY1-25, tay));
-            tspd = (PASS_SPD + SHOOT_SPD) * 0.5;
-            p.throughKick = true;
-          }
           else { tax=req.x; tay=req.y; tspd=PASS_SPD; }
-          if(botKick(p, tax, tay, tspd, 0.28)){ req.passReq=0; req.shootReq=0; req.thruReq=0; req.cpassReq=0; req.cshootReq=0; }
+          if(botKick(p, tax, tay, tspd, 0.28)){ req.passReq=0; req.shootReq=0; req.cpassReq=0; req.cshootReq=0; }
           else {
             p.throughKick = false;
             var ls=lineupSpot(tax, tay);
@@ -1307,7 +1313,6 @@ function botThink(){
         if(cmdPlayer && cmdPlayer!==p){
           obeying = true;
           if(cmdType==='pass' || cmdType==='cpass'){ aimTX = cmdPlayer.x; aimTY = cmdPlayer.y; }
-          else if(cmdType==='through'){ aimTX = cmdPlayer.x + (t===0?150:-150); aimTY = cmdPlayer.y; }
         }
         var inFinal = (!obeying || cmdType==='shoot' || cmdType==='cshoot') && (t===0 ? (ball.x > W*0.52) : (ball.x < W*0.48));
         var shotTaken = false;
@@ -1339,8 +1344,8 @@ function botThink(){
           }
           moveBot(p, tgX, tgY, sprint);
         }
-      } else if(pressOrder && !humanHolder){
-        // V emri: topa baski yap
+      } else if((pressOrder && !humanHolder) || callOrder){
+        // V: topa baski · Alt: topa git (top bizdeyken bile calisir, botlari harekete gecirir)
         var Dp = DIFFS[BOT_DIFF];
         var pSprint = Dp.sprint && p.stamina > Dp.stamMin*0.25 && !p.lock;
         moveBot(p, ball.x, ball.y, pSprint);
@@ -2730,7 +2735,7 @@ el('chatSend').onclick = sendChat;
 
 /* ================= GİRİŞ ================= */
 var DEF_BINDS = { u:'KeyW', d:'KeyS', l:'KeyA', r:'KeyD', s:'ShiftLeft', pass:'KeyX', shoot:'Space', cpass:'KeyZ', cshoot:'KeyC', through:'AltLeft', press:'KeyV' };
-var BIND_LABELS = { u:'Yukarı', d:'Aşağı', l:'Sol', r:'Sağ', s:'Sprint', pass:'Pas', shoot:'Şut', cpass:'Falsolu Pas', cshoot:'Falsolu Şut', through:'Ara Pas', press:'Baskı Yap (takım)' };
+var BIND_LABELS = { u:'Yukarı', d:'Aşağı', l:'Sol', r:'Sağ', s:'Sprint', pass:'Pas', shoot:'Şut', cpass:'Falsolu Pas', cshoot:'Falsolu Şut', through:'Topa Git (takım)', press:'Baskı Yap (takım)' };
 var binds = loadBinds();
 var listenAction = null; // su an tus bekleyen eylem
 
