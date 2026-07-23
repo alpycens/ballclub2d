@@ -753,32 +753,34 @@ function resolveBallPlayers(nearWall){
       var nx = dx/d, ny = dy/d;
       var overlap = minD - d;
       var qm = q.mass || 1, mb = BALL_MASS;
-      // KUTLE ORANLI COZUM: ust uste binme kutlelere gore paylasilir.
-      // Top agirlastikca oyuncu daha cok geri iter -> topa yaslanip etrafinda donebilirsin.
-      var wB = qm/(qm+mb);        // topun aldigi pay
-      var wP = mb/(qm+mb);        // oyuncunun aldigi pay
-      ball.x += nx*overlap*wB;  ball.y += ny*overlap*wB;
-      q.x    -= nx*overlap*wP;  q.y    -= ny*overlap*wP;
-      var bspPre = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);   // temas oncesi hiz
+      var wB = qm/(qm+mb);        // topun kutle payi (agir top -> kucuk)
+
+      // KONUM: duzeltmenin tamamini TOP alir, oyuncu GERI ITILMEZ.
+      // Boylece topa yaslanip yapisabilir, etrafinda donebilirsin.
+      ball.x += nx*overlap;  ball.y += ny*overlap;
+
+      var bspPre = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);   // temas oncesi top hizi
       var rel = (ball.vx-q.vx)*nx + (ball.vy-q.vy)*ny;
-      if(rel < 0){
-        // gercek carpisma itkisi: agir topu itmek oyuncuyu de yavaslatir
-        var e = 0.28;                                   // dusuk esneklik = yapiskan his
-        var j = -(1+e)*rel / (1/qm + 1/mb);
-        ball.vx += (j/mb)*nx;  ball.vy += (j/mb)*ny;
-        q.vx    -= (j/qm)*nx;  q.vy    -= (j/qm)*ny;     // oyuncu topa yaslanir
+
+      // 1) UZERINE GELEN TOP (sut/pas/sekme): oyuncu sabit engel gibi davranir -> top duzgun seker.
+      //    (Top agirligi yalnizca ITMEYI zorlastirir, bloklamayi degil.)
+      if(rel < 0 && bspPre > 1.4){
+        var e = 0.62;
+        ball.vx -= (1+e)*rel*nx;  ball.vy -= (1+e)*rel*ny;
+        // oyuncuya hafif geri tepme (topun momentumuyla orantili, sinirli)
+        var kick = Math.min(0.9, (-rel) * (mb/(qm+mb)) * 0.18);
+        q.vx -= kick*nx;  q.vy -= kick*ny;
       }
-      // ITME DIRENCI: agir topu one iterken oyuncu yavaslar (topu surmek efor ister).
-      // Agirlik arttikca direnc artar -> ayarlardan hissedilir sekilde degistirilebilir.
-      var push = q.vx*nx + q.vy*ny;            // oyuncunun topa dogru hiz bileseni
+
+      // 2) TOPU ITME (dribbling): top yuvarlanir, oyuncu YAVASLAR ama asla geri sekmez
+      var push = q.vx*nx + q.vy*ny;              // oyuncunun topa dogru hizi
       if(push > 0){
-        var resist = Math.min(0.62, 0.085 * mb / (qm||1));   // agirlikla olcekli itme direnci   // agirlikla dogrudan olcekli direnc
-        q.vx -= push*resist*nx; q.vy -= push*resist*ny;
-        // itilen top bu enerjinin bir kismini alir (yuvarlanir)
-        ball.vx += push*resist*nx*wB*2.2; ball.vy += push*resist*ny*wB*2.2;
+        ball.vx += push*wB*1.7*nx;  ball.vy += push*wB*1.7*ny;
+        var slow = Math.min(push, push * (mb/(qm+mb)) * 0.55);   // agir top -> daha cok direnc
+        q.vx -= slow*nx;  q.vy -= slow*ny;
       }
-      // hafif "surukleme": top oyuncunun hizinin kucuk bir kismini alir (dribbling icin)
-      ball.vx += q.vx*0.08*wB; ball.vy += q.vy*0.08*wB;
+      // cok hafif surukleme (top ayakta kalsin)
+      ball.vx += q.vx*0.05*wB; ball.vy += q.vy*0.05*wB;
       // Dokunus topu tekme gibi firlatmasin: temasin KAZANDIRDIGI hiz sinirli.
       // Zaten hizli gelen top (sut/pas/sekme) asla yavaslatilmaz.
       var qsp = Math.sqrt(q.vx*q.vx + q.vy*q.vy);
