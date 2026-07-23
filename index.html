@@ -140,6 +140,10 @@
   .lobSlot .xb { flex:0 0 auto; width:22px; padding:2px 0; font-size:12px; background:#7A3C3C; line-height:1; }
   .lobBtns { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
   .lobBtns button { flex:0 0 auto; padding:5px 10px; font-size:12px; }
+  #lobStats { background:#252E33; border:1px solid #3C4A52; border-top:none; padding:10px 16px; }
+  #lobStats .sttop { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  #lobStats #lstatLeft { font-size:11px; color:#E5B356; }
+  #lobStats #lstatReset { width:auto; padding:5px 12px; font-size:11px; margin-top:6px; }
   #lobCtrls { background:#252E33; border:1px solid #3C4A52; border-top:none;
               border-radius:0 0 8px 8px; padding:12px 16px; }
   #lobCfg { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
@@ -216,6 +220,11 @@
         <button class="hostOnly" id="addBlueBtn">+ Bot</button>
       </div>
     </div>
+  </div>
+  <div id="lobStats">
+    <div class="sttop"><span class="settitle">STATLARIM</span><span id="lstatLeft"></span></div>
+    <div id="lstatRows"></div>
+    <button id="lstatReset">Standarda Dön (hepsi 3)</button>
   </div>
   <div id="lobCtrls">
     <div id="lobCfg">
@@ -746,7 +755,15 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
         // rakip: kendi yarisinda ve yuvarlagin disinda kalir
         if(p.team===0){ var lim0 = W/2 - (PR+4); if(p.x > lim0){ p.x = lim0; p.vx = 0; } }
         else { var lim1 = W/2 + (PR+4); if(p.x < lim1){ p.x = lim1; p.vx = 0; } }
-        if(cd < CIRCLE_R+PR && cd>0){ p.x = W/2 + cdx/cd*(CIRCLE_R+PR); p.y = H/2 + cdy/cd*(CIRCLE_R+PR); }
+        var climC = CIRCLE_R+PR;
+        if(cd < climC && cd>0){
+          var cnx = cdx/cd, cny = cdy/cd;
+          p.x = W/2 + cnx*climC;
+          p.y = H/2 + cny*climC;
+          // duz orta cizgideki gibi: sadece ice dogru hizi sil, tegetsel kaymaya izin ver
+          var vnC = p.vx*cnx + p.vy*cny;
+          if(vnC < 0){ p.vx -= vnC*cnx; p.vy -= vnC*cny; }
+        }
       }
     }
 
@@ -1382,7 +1399,10 @@ function hostOnData(conn, msg){
     if(s){
       if(msg.a==='team' && (msg.team===0||msg.team===1||msg.team===2)){ s.team=msg.team; rosterChanged(); }
       else if(msg.a==='pos' && (msg.pos==='gk'||msg.pos==='fld')){ s.pos=msg.pos; rosterChanged(); }
-      else if(msg.a==='stats'){ s.stats = cleanStats(msg.stats); rosterChanged(); }
+      else if(msg.a==='stats'){
+        s.stats = cleanStats(msg.stats);
+        if(!applyStatsLive(conn.peer, s.stats)) rosterChanged();
+      }
       else if(msg.a==='style' && (msg.team===0||msg.team===1) && captainOf(msg.team)===conn.peer){
         var st=Math.min(2,Math.max(0,Math.round(msg.style)));
         LOBBY.cfg['style'+msg.team]=st; if(LOBBY.started) BOT_STYLE[msg.team]=st;
@@ -1687,10 +1707,16 @@ function saveStats(){ try{ localStorage.setItem('bc2d_stats', JSON.stringify(myS
 function statsUsed(){ var n=0; for(var i=0;i<STAT_KEYS.length;i++) n += myStats[STAT_KEYS[i]]; return n; }
 
 function renderStatRows(){
-  var host = el('statRows'); if(!host) return;
+  buildStatRows('statRows', 'statLeft');
+  buildStatRows('lstatRows', 'lstatLeft');
+}
+
+function buildStatRows(rowsId, leftId){
+  var host = el(rowsId); if(!host) return;
   host.innerHTML = '';
   var used = statsUsed(), left = STAT_TOTAL - used;
-  el('statLeft').textContent = left + ' puan kaldı  (' + used + '/' + STAT_TOTAL + ')';
+  var lf = el(leftId);
+  if(lf) lf.textContent = left + ' puan kaldı  (' + used + '/' + STAT_TOTAL + ')';
   STAT_KEYS.forEach(function(k){
     var row = document.createElement('div'); row.className='statRow';
     var nm = document.createElement('span'); nm.className='sname'; nm.textContent = STAT_LABELS[k];
@@ -1716,10 +1742,24 @@ function renderStatRows(){
 function pushMyStats(){
   if(role==='host'){
     var s = LOBBY.roster && LOBBY.roster.find(function(x){return x.id===myPid;});
-    if(s){ s.stats = cleanStats(myStats); rosterChanged(); pushLobby(); }
+    if(s){
+      s.stats = cleanStats(myStats);
+      if(!applyStatsLive(myPid, s.stats)) rosterChanged();   // mac sirasinda kickoff atmadan uygula
+      pushLobby();
+    }
   } else if(hostConn && hostConn.open){
     hostConn.send({t:'lreq', a:'stats', stats:cleanStats(myStats)});
   }
+}
+
+// mac devam ederken statlari sahadaki oyuncuya dogrudan uygula (yeniden kurulum olmadan)
+function applyStatsLive(id, stats){
+  if(!LOBBY.started || !G || !G.players) return false;
+  var p = null;
+  for(var i=0;i<G.players.length;i++) if(G.players[i].id===id){ p=G.players[i]; break; }
+  if(!p) return false;
+  applyStats(p, stats);
+  return true;
 }
 
 /* ================= LOBİ ================= */
@@ -1824,6 +1864,7 @@ function renderLobby(){
   el('lfieldSel').disabled = LOBBY.started;
   el('lgoalSel').disabled = LOBBY.started;
   el('lminSel').disabled = LOBBY.started;
+  renderStatRows();
   // mevki secici benim slotuma gore
   var ms = mySlot();
   el('posSel').value = (ms && ms.pos) ? ms.pos : 'mid';
@@ -2188,6 +2229,10 @@ el('lminSel').onchange = function(){ setCfg('mins', parseInt(this.value,10)); };
 el('lpspdInp').oninput = function(){ var v=parseInt(this.value,10); el('lpspdVal').textContent=v+'%'; if(role==='host'){ SPD_P=v/100; setCfg('spdP', v/100); } };
 el('lbspdInp').oninput = function(){ var v=parseInt(this.value,10); el('lbspdVal').textContent=v+'%'; if(role==='host'){ SPD_B=v/100; setCfg('spdB', v/100); } };
 el('lobStart').onclick = startMatch;
+el('lstatReset').onclick = function(){
+  myStats = { shot:3, curve:3, sprint:3, drib:3, power:3 };
+  saveStats(); renderStatRows(); pushMyStats();
+};
 el('lchatSend').onclick = sendLchat;
 el('lchatInp').addEventListener('keydown', function(e){ if(e.key==='Enter'){ sendLchat(); } e.stopPropagation(); });
 
@@ -2207,7 +2252,8 @@ el('copyBtn').onclick = function(){
 };
 
 // panelleri hover ile ac, mouse ayrilinca veya baska yere tiklayinca kapat
-function closePanels(){ el('setPanel').style.display='none'; el('keyPanel').style.display='none'; listenAction=null; }
+var panelPinned = null;   // 'set' | 'keys' -> tiklanarak sabitlenmis panel
+function closePanels(){ el('setPanel').style.display='none'; el('keyPanel').style.display='none'; listenAction=null; panelPinned=null; }
 function openPanel(which){
   el('setPanel').style.display = (which==='set') ? 'block' : 'none';
   el('keyPanel').style.display = (which==='keys') ? 'block' : 'none';
@@ -2220,37 +2266,44 @@ function openPanel(which){
 }
 (function(){
   var closeT = null;
-  function armClose(){ clearTimeout(closeT); closeT = setTimeout(closePanels, 350); }
-  function cancelClose(){ clearTimeout(closeT); }
   var gb = el('gearBtn'), kb = el('keysBtn'), sp = el('setPanel'), kp = el('keyPanel');
-  gb.addEventListener('mouseenter', function(){ cancelClose(); openPanel('set'); });
-  kb.addEventListener('mouseenter', function(){ cancelClose(); openPanel('keys'); });
+  function armClose(){
+    clearTimeout(closeT);
+    // sabitlenmisse veya tus bekleniyorsa kapatma
+    if(panelPinned || listenAction) return;
+    closeT = setTimeout(function(){ if(!panelPinned && !listenAction) closePanels(); }, 400);
+  }
+  function cancelClose(){ clearTimeout(closeT); }
+  gb.addEventListener('mouseenter', function(){ cancelClose(); if(!panelPinned) openPanel('set'); });
+  kb.addEventListener('mouseenter', function(){ cancelClose(); if(!panelPinned) openPanel('keys'); });
   gb.addEventListener('mouseleave', armClose);
   kb.addEventListener('mouseleave', armClose);
   sp.addEventListener('mouseenter', cancelClose);
   kp.addEventListener('mouseenter', cancelClose);
   sp.addEventListener('mouseleave', armClose);
   kp.addEventListener('mouseleave', armClose);
-  // sahaya veya baska bir yere tiklayinca kapan
+  // panelin icine tiklayinca sabitlensin (mouse cekilince kapanmaz)
+  sp.addEventListener('mousedown', function(){ panelPinned='set'; cancelClose(); });
+  kp.addEventListener('mousedown', function(){ panelPinned='keys'; cancelClose(); });
+  // butona tiklayinca sabitle / birak
+  gb.addEventListener('mousedown', function(){ panelPinned = (panelPinned==='set') ? null : 'set'; if(panelPinned) openPanel('set'); cancelClose(); });
+  kb.addEventListener('mousedown', function(){ panelPinned = (panelPinned==='keys') ? null : 'keys'; if(panelPinned) openPanel('keys'); cancelClose(); });
+  // disariya tiklayinca kapan
   document.addEventListener('mousedown', function(e){
-    var t = e.target;
-    var inside = false;
+    var t = e.target, inside = false;
     for(var n=t; n; n=n.parentNode){
       if(n===sp || n===kp || n===gb || n===kb){ inside = true; break; }
     }
-    if(!inside) closePanels();
+    if(!inside){ panelPinned=null; closePanels(); }
   });
   var cvEl = el('cv');
-  if(cvEl) cvEl.addEventListener('mouseenter', closePanels);
+  if(cvEl) cvEl.addEventListener('mousedown', function(){ panelPinned=null; closePanels(); });
 })();
 
 el('keysBtn').onclick = function(){
-  var p = el('keyPanel');
-  var open = p.style.display==='block';
-  el('setPanel').style.display='none';
-  p.style.display = open ? 'none' : 'block';
-  if(!open) renderKeyRows();
-  listenAction = null;
+  // mousedown zaten sabitlemeyi ayarladi; burada sadece dogru paneli goster
+  if(panelPinned === 'keys') openPanel('keys');
+  else closePanels();
 };
 
 el('keyReset').onclick = function(){
@@ -2260,16 +2313,10 @@ el('keyReset').onclick = function(){
 };
 
 el('gearBtn').onclick = function(){
-  el('keyPanel').style.display='none';
-  var p = el('setPanel');
-  var open = p.style.display==='block';
-  p.style.display = open ? 'none' : 'block';
-  if(!open){
-    el('setLock').style.display = setUnlocked ? 'none' : 'block';
-    el('setBody').style.display = setUnlocked ? 'block' : 'none';
+  if(panelPinned === 'set'){
+    openPanel('set');
     if(!setUnlocked){ el('pwInp').value=''; el('pwMsg').textContent=''; el('pwInp').focus(); }
-    else syncPanel();
-  }
+  } else closePanels();
 };
 
 function syncPanel(){
