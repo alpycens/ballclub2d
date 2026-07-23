@@ -305,6 +305,7 @@
       <button class="miniBtn" id="lobbyBtn">Lobi</button>
       <button class="miniBtn" id="keysBtn">Tuşlar</button>
       <button class="miniBtn" id="gearBtn">Ayarlar</button>
+      <button class="miniBtn" id="sndBtn">Ses: Açık</button>
       <button class="miniBtn" id="fsBtn">Tam Ekran</button>
     </div>
   </div>
@@ -583,7 +584,7 @@ function penBox(t){
 function newPlayer(id, name, team, bot, stats){
   var np = { id:id, name:name, team:team, bot:bot,
            x:0, y:0, vx:0, vy:0,
-           stamina:STAM_MAX, lock:false, kcd:0, passReq:0, shootReq:0, thruReq:0, cpassReq:0, cshootReq:0, pressReq:0, flash:0, keeper:false, throughKick:false,
+           stamina:STAM_MAX, lock:false, kcd:0, passReq:0, shootReq:0, thruReq:0, cpassReq:0, cshootReq:0, pressReq:0, flash:0, keeper:false, throughKick:false, kickN:0, kickPow:0,
            stats:null, fShot:1, fCurve:1, fSprint:1, fDrib:1, mass:1,
            in:{u:0,d:0,l:0,r:0,s:0}, ev:[] };
   applyStats(np, stats);
@@ -1089,6 +1090,8 @@ function tryKick(p, kind){
   }
   G.ko = false;
   p.flash = 160;
+  p.kickN = (p.kickN||0) + 1;                       // ses tetigi
+  p.kickPow = (kind==='shoot' || kind==='cshoot') ? 1 : 0;
   p.kcd = 220;
   return true;
 }
@@ -1393,6 +1396,8 @@ function botKick(p, ax, ay, spd, minDot){
   } else { ball.cw=null; ball.ct=0; ball.cd=null; }
   G.ko=false;
   p.flash=160;
+  p.kickN = (p.kickN||0) + 1;                       // ses tetigi
+  p.kickPow = (spd >= SHOOT_SPD) ? 1 : 0;
   p.kcd = DIFFS[BOT_DIFF].kcd;
   return true;
 }
@@ -1620,7 +1625,8 @@ function broadcast(){
     p: G.players.map(function(p){ return { i:p.id, n:p.name, t:p.team, b:p.bot?1:0,
         x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0,
         fl:(p.flash>0 || p.glow)?1:0, kp:(p.keeper&&p.bot)?1:0, sr:p.spr?1:0,
-        kn:(p.kit&&p.kit.num)||0, kc:(p.kit&&p.kit.color)||'' }; }),
+        kn:(p.kit&&p.kit.num)||0, kc:(p.kit&&p.kit.color)||'',
+        ks:p.kickN||0, kw:p.kickPow||0 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
     s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF,BOT_STYLE[0],BOT_STYLE[1],G_SPRINT,G_CURVE,G_SHOT,BALL_MASS],
     ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam, ck: Math.round(G.clock), mm: matchMins };
@@ -1709,7 +1715,7 @@ function loop(now){
         for(var j=0;j<Gr.p.length;j++) if(Gr.p[j].i===tp.i){ rp=Gr.p[j]; break; }
         if(!rp){ Gr.p.push(JSON.parse(JSON.stringify(tp))); continue; }
         rp.x += (tp.x-rp.x)*t; rp.y += (tp.y-rp.y)*t;
-        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fl=tp.fl; rp.kp=tp.kp; rp.sr=tp.sr; rp.kn=tp.kn; rp.kc=tp.kc;
+        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fl=tp.fl; rp.kp=tp.kp; rp.sr=tp.sr; rp.kn=tp.kn; rp.kc=tp.kc; rp.ks=tp.ks; rp.kw=tp.kw;
       }
       Gr.p = Gr.p.filter(function(rp){ return G.p.some(function(tp){return tp.i===rp.i;}); });
       Gr.b[0] += (G.b[0]-Gr.b[0])*t; Gr.b[1] += (G.b[1]-Gr.b[1])*t;
@@ -1721,7 +1727,7 @@ function loop(now){
 }
 
 function hostView(){
-  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0,kp:(p.keeper&&p.bot)?1:0,sr:p.spr?1:0,kn:(p.kit&&p.kit.num)||0,kc:(p.kit&&p.kit.color)||''};}),
+  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0,kp:(p.keeper&&p.bot)?1:0,sr:p.spr?1:0,kn:(p.kit&&p.kit.num)||0,kc:(p.kit&&p.kit.color)||'',ks:p.kickN||0,kw:p.kickPow||0};}),
            b:[G.ball.x,G.ball.y], s:G.score, ph:G.phase, m:G.msg, pa:G.paused?1:0,
            ko:(G.ko && G.phase==='play')?1:0, kt:G.koTeam, ck:Math.round(G.clock), mm:matchMins };
 }
@@ -1737,8 +1743,76 @@ function fmtTime(ms){
   return m + ':' + (s<10?'0':'') + s;
 }
 
+/* ================= SES ================= */
+var audioCtx = null;
+var sfxOn = (function(){ try { return localStorage.getItem('bc2d_sfx') !== '0'; } catch(e){ return true; } })();
+var lastKickN = {};
+
+function initAudio(){
+  if(!audioCtx){
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ audioCtx = null; }
+  }
+  if(audioCtx && audioCtx.state === 'suspended'){ try { audioCtx.resume(); } catch(e){} }
+}
+
+// Sentezlenmis vurus sesi: alcak "tok" + kisa tik. power 0 = pas, 1 = sut.
+function playKick(power, vol){
+  if(!sfxOn) return;
+  initAudio();
+  if(!audioCtx) return;
+  var t = audioCtx.currentTime;
+  var v = Math.max(0.08, Math.min(1, vol==null ? 1 : vol));
+  try {
+    // gövde: hizli inen sinus
+    var osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(165 + power*95, t);
+    osc.frequency.exponentialRampToValueAtTime(58, t + 0.10);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime((0.16 + 0.26*power) * v, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+    osc.connect(g); g.connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + 0.15);
+    // temas tiki: kisa filtreli gurultu
+    var len = Math.floor(audioCtx.sampleRate * 0.028);
+    var buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    var d = buf.getChannelData(0);
+    for(var i=0;i<len;i++){ d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 3); }
+    var src = audioCtx.createBufferSource(); src.buffer = buf;
+    var f = audioCtx.createBiquadFilter(); f.type = 'bandpass';
+    f.frequency.value = 1100 + power*1000; f.Q.value = 0.9;
+    var ng = audioCtx.createGain(); ng.gain.value = (0.10 + 0.16*power) * v;
+    src.connect(f); f.connect(ng); ng.connect(audioCtx.destination);
+    src.start(t);
+  } catch(e){}
+}
+
+// Render'da vurus sayaci artan oyuncular icin ses cal (host ve istemci ayni sekilde)
+function pollKickSounds(v){
+  if(!v || !v.p) return;
+  for(var i=0;i<v.p.length;i++){
+    var q = v.p[i];
+    var n = q.ks || 0;
+    var prev = lastKickN[q.i];
+    if(prev === undefined){ lastKickN[q.i] = n; continue; }   // ilk gorusde ses yok
+    if(n > prev){
+      // uzaklik ve saha buyuklugune gore ses seviyesi
+      var vol = 1;
+      var mep = null;
+      for(var j=0;j<v.p.length;j++) if(v.p[j].i===myPid){ mep = v.p[j]; break; }
+      if(mep){
+        var dd = Math.sqrt((q.x-mep.x)*(q.x-mep.x) + (q.y-mep.y)*(q.y-mep.y));
+        vol = Math.max(0.22, 1 - dd/(W*0.9));
+      }
+      playKick(q.kw ? 1 : 0, vol);
+    }
+    lastKickN[q.i] = n;
+  }
+}
+
 /* ================= ÇİZİM ================= */
 function render(v){
+  pollKickSounds(v);
   ctx.clearRect(0,0,W,H);
   ctx.lineJoin='round'; ctx.lineCap='round';
   // saha
@@ -1782,14 +1856,16 @@ function render(v){
     }
     var teamCol = p.t===0 ? '#E56E56' : '#5689E5';
     var kitCol = p.kc || teamCol;
+    // forma rengi tum daireyi kaplar
     ctx.fillStyle = kitCol;
     ctx.beginPath(); ctx.arc(p.x,p.y,PR,0,Math.PI*2); ctx.fill();
-    // takim rengi kalin halka (forma rengi ne olursa olsun takim belli olsun)
-    ctx.strokeStyle = teamCol; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.arc(p.x,p.y,PR-2,0,Math.PI*2); ctx.stroke();
+    // takim rengi: en distaki ince cember (forma rengini kirpmaz)
+    ctx.strokeStyle = teamCol; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(p.x,p.y,PR-1.25,0,Math.PI*2); ctx.stroke();
+    // dis kontur
     ctx.strokeStyle = flash ? '#FFFFFF' : '#1B2125';
-    ctx.lineWidth = flash ? 3.5 : 2;
-    ctx.beginPath(); ctx.arc(p.x,p.y,PR,0,Math.PI*2); ctx.stroke();
+    ctx.lineWidth = flash ? 3 : 1.6;
+    ctx.beginPath(); ctx.arc(p.x,p.y,PR+0.2,0,Math.PI*2); ctx.stroke();
     // forma numarasi
     if(p.kn){
       var lum = kitLum(kitCol);
@@ -2595,7 +2671,7 @@ function keySet(e, down){
   if(hit && running) e.preventDefault();
   if(hit) pushKeys();
 }
-document.addEventListener('keydown', function(e){ keySet(e,1); });
+document.addEventListener('keydown', function(e){ initAudio(); keySet(e,1); });
 document.addEventListener('keyup', function(e){ keySet(e,0); });
 
 function renderKeyRows(){
@@ -2777,7 +2853,7 @@ function openPanel(which){
     if(!inside){ panelPinned=null; closePanels(); }
   });
   var cvEl = el('cv');
-  if(cvEl) cvEl.addEventListener('mousedown', function(){ panelPinned=null; closePanels(); });
+  if(cvEl) cvEl.addEventListener('mousedown', function(){ initAudio(); panelPinned=null; closePanels(); });
 })();
 
 el('keysBtn').onclick = function(){
@@ -2903,6 +2979,18 @@ el('pauseBtn2').onclick = function(){
   else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, tp:1}); }
 };
 
+
+function updateSndBtn(){
+  var b = el('sndBtn');
+  if(b) b.textContent = sfxOn ? 'Ses: Açık' : 'Ses: Kapalı';
+}
+el('sndBtn').onclick = function(){
+  sfxOn = !sfxOn;
+  try { localStorage.setItem('bc2d_sfx', sfxOn ? '1' : '0'); } catch(e){}
+  if(sfxOn){ initAudio(); playKick(0, 0.7); }
+  updateSndBtn();
+};
+updateSndBtn();
 
 el('fsBtn').onclick = function(){
   var el0 = document.documentElement;
