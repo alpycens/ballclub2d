@@ -678,39 +678,35 @@ function resetPositions(){
         p.vx = 0; p.vy = 0;
       });
     });
-    // baslama vurusunu YAPAN takim: cemberde serbest ama TOPUN USTUNDE spawn olmasin
-    if(t === G.koTeam){
-      team.forEach(function(p){
-        if(p.keeper) return;
-        var sdx = p.x-W/2, sdy = p.y-H/2;
-        var sd = Math.sqrt(sdx*sdx+sdy*sdy);
-        var minSpawn = PR + BR + 34;                 // topa istemsiz degmeyecek mesafe
-        if(sd < minSpawn){
-          if(sd < 0.001){ sdx = (t===0 ? -1 : 1); sdy = 0; sd = 1; }   // kendi kalesine dogru geri
-          p.x = W/2 + (sdx/sd)*minSpawn;
-          p.y = H/2 + (sdy/sd)*minSpawn;
-          p.x = Math.max(PX0+PR, Math.min(PX1-PR, p.x));
-          p.y = Math.max(PY0+PR, Math.min(PY1-PR, p.y));
+    // SPAWN KURALI: HICBIR oyuncu orta yuvarlagin icinde veya rakip yarida dogmaz.
+    // (Baslama vurusunu yapan takim oyun basladiktan sonra cembere girebilir.)
+    team.forEach(function(p){
+      if(p.keeper) return;
+      // once kendi yarisina cek
+      if(t===0){ if(p.x > W/2-(PR+6)) p.x = W/2-(PR+6); }
+      else { if(p.x < W/2+(PR+6)) p.x = W/2+(PR+6); }
+      // sonra orta yuvarlagin tamamen disina cikar
+      var sdx = p.x-W/2, sdy = p.y-H/2;
+      var sd = Math.sqrt(sdx*sdx+sdy*sdy);
+      var lim = CIRCLE_R + PR + 6;
+      if(sd < lim){
+        if(sd < 0.001){ sdx = (t===0 ? -1 : 1); sdy = (Math.random()<0.5?-1:1)*0.35; sd = Math.sqrt(sdx*sdx+sdy*sdy); }
+        p.x = W/2 + (sdx/sd)*lim;
+        p.y = H/2 + (sdy/sd)*lim;
+        // yuvarlaktan cikarken karsi yariya tasmasin
+        if(t===0 && p.x > W/2-(PR+6)) p.x = W/2-(PR+6);
+        if(t===1 && p.x < W/2+(PR+6)) p.x = W/2+(PR+6);
+        // cizgiye bastirinca yuvarlagin icinde kalmis olabilir: dikey olarak disari kaydir
+        var cdx2 = p.x-W/2, cdy2 = p.y-H/2;
+        if(Math.sqrt(cdx2*cdx2+cdy2*cdy2) < lim){
+          var sgn = (cdy2 >= 0 ? 1 : -1);
+          var need = Math.sqrt(Math.max(0, lim*lim - cdx2*cdx2));
+          p.y = H/2 + sgn*need;
         }
-      });
-    }
-    // baslama vurusunu YAPMAYAN takim ilk kareden itibaren cemberin disinda ve kendi yarisinda
-    if(t !== G.koTeam){
-      team.forEach(function(p){
-        if(t===0){ if(p.x > W/2-(PR+6)) p.x = W/2-(PR+6); }
-        else { if(p.x < W/2+(PR+6)) p.x = W/2+(PR+6); }
-        var rdx = p.x-W/2, rdy = p.y-H/2, rd = Math.sqrt(rdx*rdx+rdy*rdy);
-        var lim = CIRCLE_R + PR + 4;
-        if(rd < lim){
-          if(rd < 0.001){ rdx = (t===0?-1:1); rdy = (Math.random()<0.5?-1:1)*0.3; rd = Math.sqrt(rdx*rdx+rdy*rdy); }
-          p.x = W/2 + (rdx/rd)*lim;
-          p.y = H/2 + (rdy/rd)*lim;
-          if(t===0 && p.x > W/2-(PR+6)) p.x = W/2-(PR+6);
-          if(t===1 && p.x < W/2+(PR+6)) p.x = W/2+(PR+6);
-        }
-        p.y = Math.max(PY0+PR, Math.min(PY1-PR, p.y));
-      });
-    }
+      }
+      p.x = Math.max(PX0+PR, Math.min(PX1-PR, p.x));
+      p.y = Math.max(PY0+PR, Math.min(PY1-PR, p.y));
+    });
   }
 }
 
