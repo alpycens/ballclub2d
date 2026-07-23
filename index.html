@@ -592,6 +592,38 @@ function newPlayer(id, name, team, bot, stats){
   return np;
 }
 
+// Forma numaralari: kaleci HER ZAMAN 1, digerleri takim icinde benzersiz.
+// Botlar mevkilerine uygun numaralar alir (def 2-5, orta 6-8, forvet 9-11).
+var ROLE_NUMS = { def:[2,3,4,5,13,14], mid:[6,8,7,15,16,17], fwd:[9,10,11,18,19,20] };
+function assignJerseyNumbers(){
+  for(var t=0;t<2;t++){
+    var team = G.players.filter(function(p){return p.team===t;});
+    var used = {};
+    // 1) kaleciler: her zaman 1 numara
+    team.forEach(function(p){ if(p.keeper){ p.kit = { num:1 }; used[1] = 1; } });
+    // 2) insan oyuncular sectikleri numarayi korur (doluysa en yakin bos numara)
+    team.forEach(function(p){
+      if(p.bot || p.keeper) return;
+      var n = (p.kit && p.kit.num) || 10;
+      if(used[n]) n = firstFreeNum(used, 2);
+      p.kit = { num:n }; used[n] = 1;
+    });
+    // 3) botlar: mevkiye uygun bos numara
+    team.forEach(function(p){
+      if(!p.bot || p.keeper) return;
+      var pool = ROLE_NUMS[p.role || 'mid'] || ROLE_NUMS.mid;
+      var n = 0;
+      for(var i=0;i<pool.length;i++){ if(!used[pool[i]]){ n = pool[i]; break; } }
+      if(!n) n = firstFreeNum(used, 2);
+      p.kit = { num:n }; used[n] = 1;
+    });
+  }
+}
+function firstFreeNum(used, from){
+  for(var n=from; n<=99; n++) if(!used[n]) return n;
+  return 99;
+}
+
 function buildGameFromRoster(){
   applyCfgLocal();
   G = { players:[], ball:{x:W/2,y:H/2,vx:0,vy:0,cw:null,ct:0,cd:null,spin:0,kickGrace:0}, score:[0,0],
@@ -606,6 +638,7 @@ function buildGameFromRoster(){
     if(s.bot) applyStats(p, botStatsFor(BOT_DIFF, p.role), true);
     G.players.push(p);
   });
+  assignJerseyNumbers();
   resetPositions();
 }
 
