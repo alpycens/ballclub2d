@@ -375,7 +375,7 @@
   <canvas id="cv" width="1000" height="520"></canvas>
   <div id="botBar">
     <div id="stamWrap">SPRINT <div id="stamOuter"><div id="stamFill"></div></div></div>
-    <div id="ctrlHint">WASD/Yön: hareket · X: pas · Space: şut · Alt: ara pas · Shift: sprint · C: boşa kaç · V: baskı</div>
+    <div id="ctrlHint">WASD/Yön: hareket · X: pas · Z: falsolu pas · Space: şut · C: falsolu şut · Alt: ara pas · Shift: sprint · V: baskı</div>
     <button id="leaveBtn">Menüye Dön</button>
   </div>
   <div id="chatWrap">
@@ -2599,14 +2599,22 @@ var BIND_LABELS = { u:'Yukarı', d:'Aşağı', l:'Sol', r:'Sağ', s:'Sprint', pa
 var binds = loadBinds();
 var listenAction = null; // su an tus bekleyen eylem
 
+var BINDS_VER = 2;   // tus semasi degisince artir -> eski kayitlar otomatik sifirlanir
 function loadBinds(){
   try {
     var s = localStorage.getItem('bc2d_binds');
-    if(s){ var o = JSON.parse(s); for(var k in DEF_BINDS) if(!o[k]) o[k]=DEF_BINDS[k]; return o; }
+    if(s){
+      var o = JSON.parse(s);
+      if(o && o.v === BINDS_VER && o.b){
+        var out = {};
+        for(var k in DEF_BINDS) out[k] = o.b[k] || DEF_BINDS[k];   // yalnizca gecerli eylemler
+        return out;
+      }
+    }
   } catch(e){}
-  return JSON.parse(JSON.stringify(DEF_BINDS));
+  return JSON.parse(JSON.stringify(DEF_BINDS));   // eski/bozuk kayit -> varsayilan sema
 }
-function saveBinds(){ try{ localStorage.setItem('bc2d_binds', JSON.stringify(binds)); }catch(e){} }
+function saveBinds(){ try{ localStorage.setItem('bc2d_binds', JSON.stringify({v:BINDS_VER, b:binds})); }catch(e){} }
 
 function normCode(c){ if(c==='ShiftRight') return 'ShiftLeft'; if(c==='AltRight') return 'AltLeft'; return c; }
 function keyLabel(c){
@@ -2637,7 +2645,14 @@ function keySet(e, down){
   // tus atama modu
   if(listenAction && down){
     e.preventDefault();
-    if(c!=='Escape') binds[listenAction] = c;
+    if(c!=='Escape'){
+      // tus baska bir eylemde kullaniliyorsa yerlerini degistir (cift atama olmasin)
+      var old = binds[listenAction];
+      for(var ak in binds){
+        if(ak !== listenAction && binds[ak] === c){ binds[ak] = old; break; }
+      }
+      binds[listenAction] = c;
+    }
     listenAction = null;
     saveBinds(); renderKeyRows();
     return;
