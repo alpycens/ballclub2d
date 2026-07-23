@@ -587,6 +587,7 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
 
     // sprint / stamina
     var sprinting = inp.s && moving && !p.lock && p.stamina>0;
+    p.spr = !!sprinting;
     if(sprinting){
       p.stamina -= STAM_DRAIN * dt*TICK_MS/1000;
       if(p.stamina<=0){ p.stamina=0; p.lock=true; }
@@ -779,18 +780,31 @@ function scoreGoal(team){
   }
 }
 
+// Vurus modeli: oyuncu bir daire ve cevresinde KICK_RANGE yaricapli menzil cemberi var.
+// Tusa basilinca kuvvet bu cemberden 360 derece uygulanir; top cemberin neresindeyse
+// oyuncu merkezinden o noktaya dogru itilir. Itki, topun MEVCUT hizina eklenir (gercek fizik).
+function applyKickImpulse(p, spd){
+  var ball = G.ball;
+  var dx = ball.x-p.x, dy = ball.y-p.y;
+  var l = Math.sqrt(dx*dx+dy*dy);
+  if(l < 0.0001){ dx = (p.team===0?1:-1); dy = 0; l = 1; }
+  var nx = dx/l, ny = dy/l;
+  var s = spd*SPD_B;
+  // itki + vuran oyuncunun momentumundan pay
+  ball.vx += nx*s + p.vx*0.25;
+  ball.vy += ny*s + p.vy*0.25;
+  var bs = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+  var maxB = SHOOT_SPD*SPD_B*1.75;
+  if(bs > maxB){ var kf = maxB/bs; ball.vx *= kf; ball.vy *= kf; }
+  return { nx:nx, ny:ny };
+}
+
 function tryKick(p, kind){
   if(p.kcd>0) return false;
   var ball=G.ball;
   if(dist(p, ball) > KICK_RANGE) return false;
-  var tx, ty, spd;
-  // her iki vurus da saf fizik: kuvvet, oyuncu merkezinden temas noktasina dogru uygulanir
-  tx = ball.x - p.x; ty = ball.y - p.y;
-  spd = (kind==='pass') ? PASS_SPD : SHOOT_SPD;
-  if(tx===0 && ty===0){ tx = p.team===0?1:-1; ty = 0; }
-  var l = Math.sqrt(tx*tx+ty*ty) || 1;
-  spd *= SPD_B;
-  ball.vx = tx/l*spd; ball.vy = ty/l*spd;
+  var spd = (kind==='pass') ? PASS_SPD : SHOOT_SPD;
+  applyKickImpulse(p, spd);
   if(kind==='shoot'){ ball.cw = p.id; ball.ct = 850; ball.cd = null; }
   else { ball.cw = null; ball.ct = 0; ball.cd = null; }
   G.ko = false;
@@ -1073,10 +1087,10 @@ function botKick(p, ax, ay, spd, minDot){
   if(minDot === -1) need = -1;                                   // kaleci: her yonden temizler
   else need = Math.max(minDot==null?0:minDot, DIFFS[BOT_DIFF].aimDot);
   if((cx*dx+cy*dy) < need) return false;   // dogru taraftan yaslanmamis: vurma, once konumlan
-  // SAF FIZIK: kuvvet oyuncu merkezinden temas noktasina dogru uygulanir (insandaki gibi)
-  var mx = cx, my = cy;
-  var s = spd*SPD_B;
-  ball.vx = mx*s; ball.vy = my*s;
+  // SAF FIZIK: insandaki ile ayni itki modeli
+  var imp = applyKickImpulse(p, spd);
+  var bl0 = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy) || 1;
+  var mx = ball.vx/bl0, my = ball.vy/bl0;
   // sert vuruslarda falso: topu hedefe dogru bukecek dik bileseni sakla
   if(spd >= SHOOT_SPD && BOT_DIFF >= 1){
     var pdot = dx*mx + dy*my;
@@ -1248,7 +1262,7 @@ function broadcast(){
   var st = { t:'st',
     p: G.players.map(function(p){ return { i:p.id, n:p.name, t:p.team, b:p.bot?1:0,
         x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10, st:Math.round(p.stamina), lk:p.lock?1:0,
-        fl:(p.flash>0 || p.glow)?1:0, kp:(p.keeper&&p.bot)?1:0 }; }),
+        fl:(p.flash>0 || p.glow)?1:0, kp:(p.keeper&&p.bot)?1:0, sr:p.spr?1:0 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
     s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF,BOT_STYLE[0],BOT_STYLE[1]],
     ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam, ck: Math.round(G.clock), mm: matchMins };
@@ -1334,7 +1348,7 @@ function loop(now){
         for(var j=0;j<Gr.p.length;j++) if(Gr.p[j].i===tp.i){ rp=Gr.p[j]; break; }
         if(!rp){ Gr.p.push(JSON.parse(JSON.stringify(tp))); continue; }
         rp.x += (tp.x-rp.x)*t; rp.y += (tp.y-rp.y)*t;
-        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fl=tp.fl; rp.kp=tp.kp;
+        rp.n=tp.n; rp.t=tp.t; rp.b=tp.b; rp.st=tp.st; rp.lk=tp.lk; rp.fl=tp.fl; rp.kp=tp.kp; rp.sr=tp.sr;
       }
       Gr.p = Gr.p.filter(function(rp){ return G.p.some(function(tp){return tp.i===rp.i;}); });
       Gr.b[0] += (G.b[0]-Gr.b[0])*t; Gr.b[1] += (G.b[1]-Gr.b[1])*t;
@@ -1346,7 +1360,7 @@ function loop(now){
 }
 
 function hostView(){
-  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0,kp:(p.keeper&&p.bot)?1:0};}),
+  return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:p.stamina,lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0,kp:(p.keeper&&p.bot)?1:0,sr:p.spr?1:0};}),
            b:[G.ball.x,G.ball.y], s:G.score, ph:G.phase, m:G.msg, pa:G.paused?1:0,
            ko:(G.ko && G.phase==='play')?1:0, kt:G.koTeam, ck:Math.round(G.clock), mm:matchMins };
 }
@@ -1390,8 +1404,14 @@ function render(v){
     var me = (p.i===myPid);
     var flash = !!p.fl; // vurusta veya X/Space/Shift basiliyken yanar
     if(me){
-      ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.arc(p.x,p.y,PR+5,0,Math.PI*2); ctx.stroke();
+      // vurus menzili cemberi: top bu cemberin icindeyken tusa basinca
+      // kuvvet merkezden topun bulundugu yone uygulanir
+      var inRange = Math.sqrt((p.x-bx)*(p.x-bx) + (p.y-by)*(p.y-by)) < KICK_RANGE;
+      ctx.setLineDash([4,4]);
+      ctx.strokeStyle = inRange ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = inRange ? 2 : 1.4;
+      ctx.beginPath(); ctx.arc(p.x,p.y,KICK_RANGE,0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
     }
     ctx.fillStyle = p.t===0 ? '#E56E56' : '#5689E5';
     ctx.strokeStyle = flash ? '#FFFFFF' : '#1B2125';
@@ -1401,6 +1421,15 @@ function render(v){
     ctx.font = (me?'bold ':'')+'11px Segoe UI, Arial';
     ctx.textAlign='center';
     ctx.fillText((p.kp?'[K] ':(p.b?'[B] ':''))+p.n, p.x, p.y+PR+14);
+    // sprint / stamina bari (botlar dahil herkes)
+    var stv = (typeof p.st==='number') ? Math.max(0, Math.min(100, p.st)) : 100;
+    if(p.sr || p.lk || stv < 99.5){
+      var bw = 26, bh = 3.5, bx0 = p.x - bw/2, by0 = p.y + PR + 18;
+      ctx.fillStyle = 'rgba(27,33,37,0.65)';
+      ctx.fillRect(bx0-1, by0-1, bw+2, bh+2);
+      ctx.fillStyle = p.lk ? '#B04B4B' : (p.sr ? '#F0C04A' : '#7E9C5E');
+      ctx.fillRect(bx0, by0, bw*(stv/100), bh);
+    }
   }
   // baslama vurusu bildirimi
   if(v.ko && !v.pa && !v.m){
