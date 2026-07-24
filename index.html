@@ -105,11 +105,11 @@
   #stamWrap { flex:0 0 auto; }
   #chatWrap { width:1000px; margin-top:8px; background:#252E33; border:1px solid #3C4A52;
               border-radius:8px; padding:8px 12px; }
-  #chatLog { height:110px; overflow-y:auto; font-size:13px; line-height:1.45;
+  #chatLog { height:86px; overflow-y:auto; font-size:13px; line-height:1.45;
              margin-bottom:6px; scrollbar-width:thin; }
   #chatLog .cn { font-weight:700; }
-  #chatLog .cn.t0 { color:#E56E56; }
-  #chatLog .cn.t1 { color:#5689E5; }
+  #chatLog .cn.t0 { color:#E8E8E8; }
+  #chatLog .cn.t1 { color:#E8E8E8; }
   #chatLog .sys { color:#8FA0A8; font-style:italic; font-size:12px; }
   #chatRow { display:flex; gap:8px; }
   #chatInp { flex:1; padding:7px 10px; background:#1B2125; color:#E8E8E8;
@@ -147,7 +147,9 @@
   .lobSlot { display:flex; align-items:center; gap:6px; padding:5px 7px; margin:4px 0;
              background:#1B2125; border:1px solid #3C4A52; border-radius:5px; font-size:13px; }
   .lobSlot.me { border-color:#CDE6B4; }
-  .lobSlot .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lobSlot .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#E8E8E8; }
+  .lobSlot .teamDot { flex:0 0 auto; width:9px; height:9px; border-radius:50%;
+                      border:1px solid rgba(0,0,0,0.45); }
   .lobSlot .tag { font-size:10px; padding:1px 5px; border-radius:3px; background:#3C4A52; color:#CDE6B4; }
   .lobSlot .tag.gk { background:#5B6E2E; color:#E8F0D8; }
   .lobSlot .capBadge { flex:0 0 auto; width:18px; height:18px; border-radius:50%; background:#E5B356;
@@ -550,7 +552,7 @@ var matchMins = 0;                                  // 0 = suresiz
 var PEN_W = 114, PEN_EXT = 45;                      // ceza sahasi: derinlik ve kale ustu/alti tasma
 var CIRCLE_R = 70;                                  // orta yuvarlak yaricapi
 // KAMERA: tuval sabit boyutta kalir, kamera oyuncuyu takip eder
-var VIEW_W = 1000, VIEW_H = 540;                    // ekranda gorunen alan (tuval)
+var VIEW_W = 1240, VIEW_H = 580;                    // ekranda gorunen alan (tuval)
 var CAM = { x:500, y:270, zoom:1.45, init:false };
 var CAM_ZOOM_MIN = 1.0, CAM_ZOOM_MAX = 2.6;
 try { var _cz = parseFloat(localStorage.getItem('bc2d_zoom')); if(!isNaN(_cz)) CAM.zoom = Math.max(CAM_ZOOM_MIN, Math.min(CAM_ZOOM_MAX, _cz)); } catch(e){}
@@ -2260,7 +2262,7 @@ function render(v){
     ctx.fillStyle='rgba(27,33,37,0.55)';
     ctx.font='bold 15px Segoe UI, Arial'; ctx.textAlign='center';
     var kn = teamNameOf(v, v.kt);
-    ctx.fillStyle = (v.tc && v.tc[v.kt]) ? v.tc[v.kt] : TEAM_COL[v.kt];
+    ctx.fillStyle = readableCol((v.tc && v.tc[v.kt]) ? v.tc[v.kt] : TEAM_COL[v.kt]);
     ctx.fillText('Kick-off: ' + kn, W/2, PY0 - 12);
   }
   ctx.restore();   // ---- EKRAN KATMANI (HUD) ----
@@ -2398,6 +2400,21 @@ var KIT_NAMES = ['Red','Blue','Amber','Green','Purple','Cyan','White','Charcoal'
 var DEF_TEAM_COL = ['#E56E56', '#5689E5'];
 
 // Secilen forma rengine gore takim adi (RED/BLUE yerine gercek renk adi)
+// Koyu bir forma rengi koyu zeminde okunmaz; yaziya uygun acik varyant uret
+function readableCol(hex){
+  if(typeof hex !== 'string' || hex.charAt(0) !== '#' || hex.length < 7) return '#E8E8E8';
+  var r = parseInt(hex.substr(1,2),16), g = parseInt(hex.substr(3,2),16), b = parseInt(hex.substr(5,2),16);
+  var lum = (0.299*r + 0.587*g + 0.114*b)/255;
+  if(lum >= 0.42) return hex;                       // yeterince acik
+  var f = (0.55 - lum) * 1.5;                       // ne kadar koyuysa o kadar acilt
+  f = Math.max(0, Math.min(0.82, f));
+  r = Math.round(r + (255-r)*f);
+  g = Math.round(g + (255-g)*f);
+  b = Math.round(b + (255-b)*f);
+  function hx(n){ return ('0'+n.toString(16)).slice(-2); }
+  return '#' + hx(r) + hx(g) + hx(b);
+}
+
 function colName(hex){
   var i = KIT_COLORS.indexOf(hex);
   if(i >= 0 && KIT_NAMES[i]) return KIT_NAMES[i];
@@ -2823,11 +2840,11 @@ function renderLobby(){
   if(hdrs && hdrs.length>=2){
     // baslik hem secilen rengi hem de o rengin adini gosterir
     if(hdrs[0]){
-      hdrs[0].style.color = LOBBY.cfg.tc0 || DEF_TEAM_COL[0];
+      hdrs[0].style.color = readableCol(LOBBY.cfg.tc0 || DEF_TEAM_COL[0]);
       hdrs[0].textContent = colName(LOBBY.cfg.tc0 || DEF_TEAM_COL[0]).toUpperCase();
     }
     if(hdrs[2]){
-      hdrs[2].style.color = LOBBY.cfg.tc1 || DEF_TEAM_COL[1];
+      hdrs[2].style.color = readableCol(LOBBY.cfg.tc1 || DEF_TEAM_COL[1]);
       hdrs[2].textContent = colName(LOBBY.cfg.tc1 || DEF_TEAM_COL[1]).toUpperCase();
     }
   }
@@ -2838,8 +2855,13 @@ function renderLobby(){
   LOBBY.roster.forEach(function(s){
     var row = document.createElement('div');
     row.className = 'lobSlot' + (s.id===myPid?' me':'');
+    if(s.team===0 || s.team===1){
+      var tdot = document.createElement('span');
+      tdot.className = 'teamDot';
+      tdot.style.background = (s.team===0 ? (LOBBY.cfg.tc0||DEF_TEAM_COL[0]) : (LOBBY.cfg.tc1||DEF_TEAM_COL[1]));
+      row.appendChild(tdot);
+    }
     var nm = document.createElement('span'); nm.className='nm'; nm.textContent = (s.bot?'🤖 ':'')+s.name;
-    if(s.team===0 || s.team===1) nm.style.color = (s.team===0 ? (LOBBY.cfg.tc0||DEF_TEAM_COL[0]) : (LOBBY.cfg.tc1||DEF_TEAM_COL[1]));
     row.appendChild(nm);
     if(s.team===0||s.team===1){
       if(!s.bot){
