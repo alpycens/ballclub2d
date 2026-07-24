@@ -122,9 +122,19 @@
   /* olcekleme */
   #gameScale { transform-origin: top center; }
   #fsBtn { flex:0 0 auto; padding:5px 12px; font-size:12px; }
-  body.fsmode { justify-content:center; align-items:center; padding:0; margin:0; overflow:hidden; }
-  body.fsmode #gameWrap { margin-top:0; }
+  body.fsmode { justify-content:flex-start; align-items:flex-start; padding:0; margin:0; overflow:hidden; }
+  body.fsmode #gameWrap { margin-top:0; width:100vw; height:100vh; }
+  body.fsmode #gameScale { position:relative; width:100vw; height:100vh; }
   body.fsmode #menu, body.fsmode #lobby { margin-top:0; }
+  /* tam ekranda ust/alt cubuk ve sohbet tuvalin uzerine biner */
+  body.fsmode #topBar { position:absolute; top:0; left:0; z-index:5;
+    background:rgba(37,46,51,0.82); border:none; border-radius:0; backdrop-filter:blur(2px); }
+  body.fsmode #botBar { position:absolute; bottom:0; left:0; z-index:5;
+    background:rgba(37,46,51,0.82); border:none; border-radius:0; backdrop-filter:blur(2px); }
+  body.fsmode #chatWrap { position:absolute; left:10px; bottom:58px; z-index:4;
+    background:rgba(37,46,51,0.78); border-color:#3C4A52; }
+  body.fsmode #chatLog { height:70px; }
+  body.fsmode #cv { display:block; }
   html:fullscreen, html:-webkit-full-screen { background:#1B2125; }
   html:fullscreen body, html:-webkit-full-screen body { min-height:100vh; justify-content:center; background:#1B2125; }
 
@@ -385,7 +395,7 @@
       <label>Short ball power: <span id="gpaVal">100%</span></label>
       <input type="range" id="gpaInp" min="50" max="200" step="10" value="100">
       <label>Camera zoom: <span id="gzmVal">145%</span></label>
-      <input type="range" id="gzmInp" min="45" max="260" step="5" value="145">
+      <input type="range" id="gzmInp" min="40" max="600" step="5" value="145">
       <label>Ball weight: <span id="gbmVal">145%</span></label>
       <input type="range" id="gbmInp" min="50" max="600" step="10" value="220">
       <div id="cfgShare">
@@ -554,20 +564,24 @@ var CIRCLE_R = 70;                                  // orta yuvarlak yaricapi
 // KAMERA: tuval sabit boyutta kalir, kamera oyuncuyu takip eder
 var VIEW_W = 1240, VIEW_H = 580;                    // ekranda gorunen alan (tuval)
 var CAM = { x:500, y:270, zoom:1.45, init:false };
-var CAM_ZOOM_MIN = 0.45, CAM_ZOOM_MAX = 2.6;
-// 1 = tum saha, 4 = en yakin
-var CAM_PRESETS = [null, 'fit', 1.15, 1.45, 1.95];
+var CAM_ZOOM_MIN = 0.40, CAM_ZOOM_MAX = 6.0;
+// Kademeler "tum saha" zoomunun katidir: 1 = tum saha, 4 = en yakin.
+// Boylece hem saha boyutu hem ekran boyutu degisse de kademeler tutarli kalir.
+var CAM_PRESET_MUL = [null, 1.0, 1.32, 1.72, 2.25];
 var camToast = { ms:0, txt:'' };
 
 // tum sahanin sigacagi zoom
 function fitZoom(){
   return Math.max(CAM_ZOOM_MIN, Math.min(VIEW_W/(W+50), VIEW_H/(H+50)));
 }
+function presetZoom(n){
+  var z = fitZoom() * (CAM_PRESET_MUL[n] || 1);
+  return Math.max(CAM_ZOOM_MIN, Math.min(CAM_ZOOM_MAX, z));
+}
 function setCamPreset(n){
   n = Math.max(1, Math.min(4, n|0));
   CAM.preset = n;
-  CAM.zoom = (CAM_PRESETS[n]==='fit') ? fitZoom() : CAM_PRESETS[n];
-  CAM.zoom = Math.max(CAM_ZOOM_MIN, Math.min(CAM_ZOOM_MAX, CAM.zoom));
+  CAM.zoom = presetZoom(n);
   try { localStorage.setItem('bc2d_campreset', String(n)); } catch(e){}
   camToast.txt = (n===1 ? 'Camera 1 · Whole pitch' : 'Camera ' + n);
   camToast.ms = 1100;
@@ -581,8 +595,7 @@ try {
   var _cz = parseFloat(localStorage.getItem('bc2d_zoom'));
   if(!isNaN(_cz)) CAM.zoom = _cz;
 } catch(e){}
-// kademe secilmisse zoom kademenin degeri olsun ('fit' saha kurulunca hesaplanir)
-if(CAM.preset >= 2 && typeof CAM_PRESETS[CAM.preset] === 'number') CAM.zoom = CAM_PRESETS[CAM.preset];
+// kademe zoomu saha/gorus alani kurulunca hesaplanir (setField -> fitScale)
 
 // Kamerayi hedefe yumusakca yaklastir ve saha disina tasmasini engelle
 function updateCamera(v){
@@ -671,7 +684,7 @@ function setField(fs){
   CIRCLE_R = Math.round((PY1-PY0)*0.17);
   applyCanvasRes(canvasRes / (window.devicePixelRatio || 1));
   CAM.init = false;
-  if(CAM.preset === 1) CAM.zoom = fitZoom();
+  if(CAM.preset >= 1 && CAM.preset <= 4) CAM.zoom = presetZoom(CAM.preset);
   el('topBar').style.width=VIEW_W+'px';
   el('botBar').style.width=VIEW_W+'px';
   el('chatWrap').style.width=VIEW_W+'px';
@@ -3137,23 +3150,46 @@ function fsActive(){
   if(isFs()) return true;
   return (window.innerHeight >= screen.height - 2) && (window.innerWidth >= screen.width - 2);
 }
+var VIEW_W_BASE = 1240, VIEW_H_BASE = 580;
+
 function fitScale(){
   var sc = el('gameScale'); if(!sc || el('gameWrap').style.display==='none') return;
-  // olcusuz haliyle gercek boyutu al
+  var fs = fsActive();
+  document.body.classList.toggle('fsmode', !!fs);
+
+  if(fs){
+    // TAM EKRAN: tuval ekranin tamamini kaplar, cubuklar/sohbet uzerine biner
+    sc.style.transform = 'none';
+    sc.style.marginBottom = '0px';
+    sc.style.width = window.innerWidth + 'px';
+    VIEW_W = Math.max(640, Math.round(window.innerWidth));
+    VIEW_H = Math.max(360, Math.round(window.innerHeight));
+    el('topBar').style.width = VIEW_W + 'px';
+    el('botBar').style.width = VIEW_W + 'px';
+    el('chatWrap').style.width = Math.min(430, Math.round(VIEW_W*0.34)) + 'px';
+    if(CAM.preset >= 1 && CAM.preset <= 4) CAM.zoom = presetZoom(CAM.preset);
+    applyCanvasRes(1);
+    return;
+  }
+
+  // PENCERE MODU: sabit gorus alani + olcekleme
+  if(VIEW_W !== VIEW_W_BASE || VIEW_H !== VIEW_H_BASE){
+    VIEW_W = VIEW_W_BASE; VIEW_H = VIEW_H_BASE;
+    el('topBar').style.width = VIEW_W + 'px';
+    el('botBar').style.width = VIEW_W + 'px';
+    el('chatWrap').style.width = VIEW_W + 'px';
+    if(CAM.preset >= 1 && CAM.preset <= 4) CAM.zoom = presetZoom(CAM.preset);
+  }
   sc.style.transform = 'none';
   sc.style.marginBottom = '0px';
+  sc.style.width = VIEW_W + 'px';
   var w = sc.offsetWidth, hh = sc.offsetHeight;
   if(!w || !hh) return;
-  var fs = fsActive();
-  var pad = fs ? 8 : 24;
-  var vw = window.innerWidth - pad;
-  var vh = window.innerHeight - pad;
+  var vw = window.innerWidth - 24;
+  var vh = window.innerHeight - 24;
   var k = Math.min(vw/w, vh/hh);
-  k = Math.max(0.5, Math.min(k, fs ? 4 : 2.2));
-  document.body.classList.toggle('fsmode', !!fs);
+  k = Math.max(0.5, Math.min(k, 2.2));
   sc.style.transform = 'scale(' + k + ')';
-  // ÖNEMLİ: transform layout boyutunu degistirmez. Buyuyen gorsel yukseklik kadar
-  // yer ayirmazsak alt kisim (sohbet) ekranin disinda kalir.
   sc.style.marginBottom = Math.round(hh * (k - 1)) + 'px';
   applyCanvasRes(k);
 }
