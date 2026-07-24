@@ -164,6 +164,18 @@
   .kitRow input[type=number] { width:70px; padding:6px 8px; background:#1B2125; color:#E8E8E8;
     border:1px solid #3C4A52; border-radius:4px; font-size:13px; }
   .kitSw { width:22px; height:22px; border-radius:50%; border:2px solid #3C4A52; cursor:pointer; padding:0; }
+  .kitPickBtn { display:flex; align-items:center; gap:8px; width:100%; padding:7px 10px;
+                background:#1B2125; border:1px solid #4C5E68; border-radius:6px;
+                color:#D8E2E6; font-size:12px; font-weight:600; cursor:pointer; }
+  .kitPickBtn:hover:not(:disabled) { background:#232C31; border-color:#6E8089; }
+  .kitPickBtn:disabled { opacity:0.6; cursor:default; }
+  .kitDot { flex:0 0 auto; width:18px; height:18px; border-radius:50%; border:2px solid #0F1417; }
+  .kitGrid { display:grid; grid-template-columns:repeat(6, 1fr); gap:7px; margin-top:7px;
+             padding:9px; background:#1B2125; border:1px solid #3C4A52; border-radius:7px; }
+  .kitGrid .kitCell { width:100%; height:30px; padding:0; border-radius:6px;
+                      border:2px solid rgba(255,255,255,0.12); cursor:pointer; transition:transform .08s; }
+  .kitGrid .kitCell:hover { transform:scale(1.12); border-color:#FFFFFF; }
+  .kitGrid .kitCell.sel { border-color:#FFFFFF; box-shadow:0 0 0 2px rgba(255,255,255,0.35); }
   .kitSw.sel { border-color:#FFFFFF; box-shadow:0 0 0 2px rgba(255,255,255,0.25); }
   #kitColors, #lkitColors { display:flex; gap:6px; flex-wrap:wrap; }
   #lobStats { background:#252E33; border:1px solid #3C4A52; border-top:none; padding:10px 16px; }
@@ -195,7 +207,7 @@
 
 <div id="menu">
   <div class="brand"><span class="logo" role="img" aria-label="BallClub2D"></span><h1>BALLCLUB2D</h1></div>
-  <div class="sub">2D football with bots · WASD/Arrows to move · X pass · Space shoot · Shift sprint</div>
+  <div class="sub">2D football with bots · WASD/Arrows to move · X short ball · Space long ball · Shift sprint</div>
   <label>Your nickname</label>
   <input id="nameInp" maxlength="14" placeholder="Player">
   <div id="statBox">
@@ -341,9 +353,9 @@
       <input type="range" id="ggsInp" min="60" max="180" step="10" value="100">
       <label>Curve (all): <span id="ggcVal">100%</span></label>
       <input type="range" id="ggcInp" min="0" max="250" step="10" value="100">
-      <label>Shot power (all): <span id="ggkVal">100%</span></label>
+      <label>Long ball power (all): <span id="ggkVal">100%</span></label>
       <input type="range" id="ggkInp" min="60" max="180" step="10" value="100">
-      <label>Pass power: <span id="gpaVal">100%</span></label>
+      <label>Short ball power: <span id="gpaVal">100%</span></label>
       <input type="range" id="gpaInp" min="50" max="200" step="10" value="100">
       <label>Ball weight: <span id="gbmVal">145%</span></label>
       <input type="range" id="gbmInp" min="50" max="600" step="10" value="220">
@@ -470,7 +482,7 @@ function cleanBotStatsTable(t){
   return out;
 }
 var STAT_KEYS = ['shot','curve','sprint','drib','power','energy'];
-var STAT_LABELS = { shot:'Shot power', curve:'Curve', sprint:'Sprint speed', drib:'Dribbling speed', power:'Strength (push/resist)', energy:'Max energy (sprint time)' };
+var STAT_LABELS = { shot:'Long ball power', curve:'Curve', sprint:'Sprint speed', drib:'Dribbling speed', power:'Strength (push/resist)', energy:'Max energy (sprint time)' };
 var STAT_MIN = 1, STAT_MAX = 10, STAT_TOTAL = 40;
 function cleanStats(s){
   var o = {}, sum = 0;
@@ -2689,6 +2701,7 @@ function rosterChanged(){
   }
 }
 
+var kitPickerOpen = null;   // acik forma paleti (0/1/null)
 function renderLobby(){
   var cols = { 0:el('colRed'), 1:el('colBlue'), 2:el('colSpec') };
   var hdrs = document.querySelectorAll ? document.querySelectorAll('.lobColHead') : [];
@@ -2740,19 +2753,41 @@ function renderLobby(){
     var labC = document.createElement('label');
     labC.style.cssText = 'font-size:11px;color:#9FB3BB';
     labC.textContent = 'Kit colour' + (capC ? ' (captain)' : '');
-    var sw = document.createElement('div');
-    sw.style.cssText = 'display:flex;gap:5px;flex-wrap:wrap';
     var cur = (team===0 ? LOBBY.cfg.tc0 : LOBBY.cfg.tc1) || DEF_TEAM_COL[team];
-    KIT_COLORS.forEach(function(c){
-      var b = document.createElement('button');
-      b.className = 'kitSw' + (cur===c ? ' sel' : '');
-      b.style.background = c;
-      b.disabled = !capC;
-      b.title = capC ? 'Pick team kit colour' : 'Only the captain can change this';
-      b.onclick = function(){ setTeamColor(team, c); };
-      sw.appendChild(b);
-    });
-    wrapC.appendChild(labC); wrapC.appendChild(sw);
+
+    // mevcut rengi gosteren buton - tiklayinca buyuk palet acilir
+    var pickBtn = document.createElement('button');
+    pickBtn.className = 'kitPickBtn';
+    pickBtn.disabled = !capC;
+    pickBtn.title = capC ? 'Click to choose the team kit colour' : 'Only the captain can change this';
+    var dot = document.createElement('span');
+    dot.className = 'kitDot';
+    dot.style.background = cur;
+    var txt = document.createElement('span');
+    txt.textContent = capC ? (kitPickerOpen===team ? 'Close palette' : 'Change colour') : 'Team colour';
+    pickBtn.appendChild(dot); pickBtn.appendChild(txt);
+    pickBtn.onclick = function(){
+      if(!capC) return;
+      kitPickerOpen = (kitPickerOpen===team) ? null : team;
+      renderLobby();
+    };
+    wrapC.appendChild(labC);
+    wrapC.appendChild(pickBtn);
+
+    // acik palet
+    if(capC && kitPickerOpen===team){
+      var grid = document.createElement('div');
+      grid.className = 'kitGrid';
+      KIT_COLORS.forEach(function(c){
+        var b = document.createElement('button');
+        b.className = 'kitCell' + (cur===c ? ' sel' : '');
+        b.style.background = c;
+        b.title = c;
+        b.onclick = function(){ kitPickerOpen = null; setTeamColor(team, c); };
+        grid.appendChild(b);
+      });
+      wrapC.appendChild(grid);
+    }
     colEl.appendChild(wrapC);
   });
 
@@ -2769,7 +2804,7 @@ function renderLobby(){
     lab.textContent = 'Bot style' + (cap?' (captain)':'');
     var sel = document.createElement('select');
     sel.style.cssText='padding:5px 8px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:12px';
-    ['Defenderif','Dengeli','Ofansif'].forEach(function(t,i){
+    ['Defensive','Balanced','Offensive'].forEach(function(t,i){
       var o=document.createElement('option'); o.value=i; o.textContent=t; sel.appendChild(o);
     });
     sel.value = ''+(team===0?LOBBY.cfg.style0:LOBBY.cfg.style1);
@@ -2983,7 +3018,7 @@ el('chatSend').onclick = sendChat;
 
 /* ================= GİRİŞ ================= */
 var DEF_BINDS = { u:'KeyW', d:'KeyS', l:'KeyA', r:'KeyD', s:'ShiftLeft', pass:'KeyX', shoot:'Space', cpass:'KeyZ', cshoot:'KeyC', through:'AltLeft', press:'KeyV', gkout:'ControlLeft', lobby:'Escape', pause:'KeyP' };
-var BIND_LABELS = { u:'Up', d:'Down', l:'Left', r:'Right', s:'Sprint', pass:'Pass', shoot:'Shoot', cpass:'Curved Pass', cshoot:'Curved Shot', through:'Call to Ball (team)', press:'Press (team)', gkout:'Keeper Rush', lobby:'Lobby (toggle)', pause:'Pause Match' };
+var BIND_LABELS = { u:'Up', d:'Down', l:'Left', r:'Right', s:'Sprint', pass:'Short Ball', shoot:'Long Ball', cpass:'Curve Pass', cshoot:'Curve Long Ball', through:'Call to Ball (team)', press:'Press (team)', gkout:'Keeper Rush', lobby:'Lobby (toggle)', pause:'Pause Match' };
 var binds = loadBinds();
 var listenAction = null; // su an tus bekleyen eylem
 
@@ -3097,10 +3132,10 @@ function updateCtrlHint(){
   function K(a){ return '<b>' + keyLabelShort(binds[a]) + '</b>'; }
   e.innerHTML =
     '<span>Move</span> ' + K('u') + K('l') + K('d') + K('r') +
-    ' &nbsp;<span>Pass</span> ' + K('pass') +
-    ' &nbsp;<span>Curved pass</span> ' + K('cpass') +
-    ' &nbsp;<span>Shoot</span> ' + K('shoot') +
-    ' &nbsp;<span>Curved shot</span> ' + K('cshoot') +
+    ' &nbsp;<span>Short ball</span> ' + K('pass') +
+    ' &nbsp;<span>Curve pass</span> ' + K('cpass') +
+    ' &nbsp;<span>Long ball</span> ' + K('shoot') +
+    ' &nbsp;<span>Curve long ball</span> ' + K('cshoot') +
     ' &nbsp;<span>Sprint</span> ' + K('s') +
     ' &nbsp;<span>Call ball</span> ' + K('through') +
     ' &nbsp;<span>Press</span> ' + K('press') +
@@ -3153,7 +3188,7 @@ function sendEvent(a){
 /* ================= MENÜ ================= */
 function menuMsg(s){ el('menuMsg').textContent = s; }
 function readMenu(){
-  myName = el('nameInp').value.trim() || 'Oyuncu';
+  myName = el('nameInp').value.trim() || 'Player';
 }
 
 function initLobbyHost(){
