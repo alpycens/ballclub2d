@@ -513,8 +513,8 @@ var DIFFS = [
   { spd:1.00, aimErr:0.46, shootRange:250, sprint:true, sprintDist:120, kcd:560, keepErr:30, press:0, stamMin:45, aimDot:0.10, keepOut:0.20 },
   { spd:1.00, aimErr:0.28, shootRange:330, sprint:true, sprintDist:70,  kcd:360, keepErr:16, press:1, stamMin:32, aimDot:0.50, keepOut:0.35 },
   { spd:1.00, aimErr:0.16, shootRange:450, sprint:true, sprintDist:42,  kcd:265, keepErr:8,  press:1, stamMin:22, aimDot:0.70, keepOut:0.50 },
-  { spd:1.00, aimErr:0.09, shootRange:640, sprint:true, sprintDist:26,  kcd:195, keepErr:3,  press:2, stamMin:14, aimDot:0.80, keepOut:0.65 },
-  { spd:1.00, aimErr:0.04, shootRange:780, sprint:true, sprintDist:16,  kcd:150, keepErr:0,  press:2, stamMin:8,  aimDot:0.92, keepOut:0.80 }
+  { spd:1.00, aimErr:0.09, shootRange:640, sprint:true, sprintDist:26,  kcd:195, keepErr:5,  press:2, stamMin:14, aimDot:0.80, keepOut:0.65 },
+  { spd:1.00, aimErr:0.04, shootRange:780, sprint:true, sprintDist:16,  kcd:150, keepErr:3,  press:2, stamMin:8,  aimDot:0.92, keepOut:0.80 }
 ];
 var TICK_MS = 1000/60, NET_MS = 1000/30;
 
@@ -1225,9 +1225,12 @@ function botThink(){
     var kb = keeper ? penBox(t) : null;
     var ballNearGoal = kb ? (ball.x > kb.x0-20 && ball.x < kb.x1+20 && ball.y > kb.y0-20 && ball.y < kb.y1+20) : false;
     // insan takim arkadasi topu tutuyorsa botlar ona mudahale etmez, destege gider
-    var humanHolder = null;
+    var humanHolder = null, holder = null;
     for(var hi=0; hi<team.length; hi++){
-      if(!team[hi].bot && dist(team[hi], ball) < KICK_RANGE + 14){ humanHolder = team[hi]; break; }
+      if(dist(team[hi], ball) < KICK_RANGE + 14){
+        if(!holder) holder = team[hi];
+        if(!team[hi].bot){ humanHolder = team[hi]; holder = team[hi]; break; }
+      }
     }
     // takim komutu: V = baski yap
     var pressOrder = false, callOrder = false, gkOutOrder = false;
@@ -1350,8 +1353,7 @@ function botThink(){
                           Math.hypot(w3.x-p.x, w3.y-p.y) > 110;
             moveBot(p, w3.x, w3.y, rSprint);
           }
-        } else if(Math.abs(p.x-gx) < D.shootRange + BOT_STYLE[t]*40 &&
-                  (Math.abs(p.x-gx) < 260 || !bestPassMate(p, t))){
+        } else if(canShootNow(p, t, gx, gy, D)){
           // sut: gole yaklastikca daha atilgan (dusuk hizalanma esigi)
           var distGoal = Math.abs(p.x-gx);
           var aimY = gy + rnd(-GOAL_H*D.aimErr, GOAL_H*D.aimErr);
@@ -1400,14 +1402,16 @@ function botThink(){
         }
         var inFinal = (!obeying || cmdType==='shoot' || cmdType==='cshoot') && (t===0 ? (ball.x > W*0.52) : (ball.x < W*0.48));
         var shotTaken = false;
-        if(inFinal){
-          // kaleciden uzak koseyi hedefle
-          var oppKeeper = null;
-          for(var ok=0; ok<G.players.length; ok++){ var q2=G.players[ok]; if(q2.team!==t && q2.keeper){ oppKeeper=q2; break; } }
-          var aimY2;
-          if(oppKeeper){ aimY2 = (oppKeeper.y > gy2) ? (GY0+18) : (GY1-18); }
-          else aimY2 = gy2 + rnd(-GOAL_H*Dc.aimErr, GOAL_H*Dc.aimErr);
-          aimY2 += rnd(-GOAL_H*Dc.aimErr*0.5, GOAL_H*Dc.aimErr*0.5);
+        // kaleciden uzak koseyi hedefle, sonra O hattin acik olup olmadigina bak
+        var oppKeeper = null;
+        for(var ok=0; ok<G.players.length; ok++){ var q2=G.players[ok]; if(q2.team!==t && q2.keeper){ oppKeeper=q2; break; } }
+        var aimY2;
+        if(oppKeeper){ aimY2 = (oppKeeper.y > gy2) ? (GY0+18) : (GY1-18); }
+        else aimY2 = gy2 + rnd(-GOAL_H*Dc.aimErr, GOAL_H*Dc.aimErr);
+        aimY2 += rnd(-GOAL_H*Dc.aimErr*0.5, GOAL_H*Dc.aimErr*0.5);
+        var laneClear = blockersOnLane(ball.x, ball.y, gx2, aimY2, t, PR+BR+3, true) === 0;
+        var closeIn = Math.abs(ball.x - gx2) < 130;
+        if(inFinal && (laneClear || closeIn)){
           var dg = Math.abs(ball.x - gx2);
           var md = dg<170 ? 0.1 : (dg<340 ? 0.28 : 0.42);
           shotTaken = botKick(p, gx2, aimY2, SHOOT_SPD, md);
@@ -1467,8 +1471,8 @@ function botThink(){
           ty = ball.y*0.55 + (PY0 + frac*(PY1-PY0))*0.45;   // topun y'sini de takip et
         }
 
-        if(humanHolder){
-          // insan topa sahip: destek konumu al (topun onunde, yandan, uzaktan)
+        if(holder && holder !== p){
+          // takim arkadasi topa sahip: destek konumu al (onde, yanda, pas hatti acik)
           var fwdDir = (t===0 ? 1 : -1);
           var lane = (slot % 2 === 0) ? -1 : 1;
           if(p.role==='fwd'){
@@ -1567,6 +1571,50 @@ function avoidBallPath(p, tx, ty){
 
 // Bot pas karari: rakip baskisi varsa veya arkadas belirgin sekilde daha iyi konumdaysa,
 // pas hatti temizse o arkadasa pas at. (bot-bot paslasma)
+// Bir noktadan digerine giden hat rakip tarafindan kapali mi?
+// clear: gerekli bosluk. Dondurur: engelleyen rakip sayisi.
+function blockersOnLane(fromX, fromY, toX, toY, team, clear, ignoreKeeper){
+  var vx = toX-fromX, vy = toY-fromY;
+  var vl = Math.sqrt(vx*vx+vy*vy);
+  if(vl < 1) return 0;
+  var ux = vx/vl, uy = vy/vl, n = 0;
+  for(var i=0;i<G.players.length;i++){
+    var o = G.players[i];
+    if(o.team === team) continue;
+    if(ignoreKeeper && o.keeper) continue;      // kaleciyi asmak zaten sutun amaci
+    var wx = o.x-fromX, wy = o.y-fromY;
+    var pr = wx*ux + wy*uy;
+    if(pr <= 0 || pr >= vl) continue;
+    var px = wx - pr*ux, py = wy - pr*uy;
+    if(Math.sqrt(px*px+py*py) < clear) n++;
+  }
+  return n;
+}
+
+// Sut atmali mi? Menzil + hat kontrolu + daha iyi pas var mi
+function canShootNow(p, t, gx, gy, D){
+  var distGoal = Math.abs(p.x - gx);
+  if(distGoal > D.shootRange + BOT_STYLE[t]*40) return false;
+  // sut hatti kapali mi (onunde rakip)
+  var blockers = blockersOnLane(G.ball.x, G.ball.y, gx, gy, t, PR+BR+3, true);
+  if(blockers > 0){
+    // cok yakinsa yine de dene (koseden sikistirma), degilse pas ara
+    if(distGoal < 120 && blockers < 2) return true;
+    return false;
+  }
+  // hat acik: yakinda mutlaka vur
+  if(distGoal < 300) return true;
+  // uzaktan: daha iyi bir pas yoksa vur
+  return !bestPassMate(p, t);
+}
+
+// Bir oyuncunun kaleye acik sut sansi var mi
+function hasShotLane(m, t){
+  var gx = t===0 ? PX1 : PX0, gy = (GY0+GY1)/2;
+  if(Math.abs(m.x-gx) > 520) return false;
+  return blockersOnLane(m.x, m.y, gx, gy, t, PR+BR+2, true) === 0;
+}
+
 function bestPassMate(p, t){
   var ball = G.ball;
   // uzerimde baski var mi
@@ -1607,11 +1655,18 @@ function bestPassMate(p, t){
       if(o2.team===t) continue;
       var d2=dist(m,o2); if(d2<mFree) mFree=d2;
     }
-    var score = (mAdv-myAdv)*0.9 + mFree*1.1 + press*70 - md*0.25;
-    if(score > bestScore + 45){ bestScore=score; best=m; }
+    // arkadasin kaleye acik sutu var mi (varsa pas cok degerli)
+    var shotBonus = hasShotLane(m, t) ? 190 : 0;
+    // kaleye yakinlik odulu
+    var goalNear = Math.max(0, 420 - Math.abs(m.x - goalX)) * 0.35;
+    // ileri pas tercih edilir, geri pas sadece baski altinda
+    var fwdGain = (mAdv - myAdv);
+    var backPen = (fwdGain < 0 && press === 0) ? -120 : 0;
+    var score = fwdGain*1.0 + mFree*1.2 + press*90 + shotBonus + goalNear + backPen - md*0.20;
+    if(score > bestScore){ bestScore=score; best=m; }
   }
-  // baski yoksa ve fark azsa pas yerine devam etsin
-  if(best && press===0 && bestScore < 150) return null;
+  // baski yoksa ve secenek zayifsa pas yerine devam et
+  if(best && press===0 && bestScore < 120) return null;
   return best;
 }
 
