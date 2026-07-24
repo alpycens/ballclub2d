@@ -1157,8 +1157,8 @@ function togglePause(){
 
 function endMatchByTime(){
   G.phase='end'; G.ptimer=4500;
-  if(G.score[0]>G.score[1]) G.msg='TIME UP - RED WINS!';
-  else if(G.score[1]>G.score[0]) G.msg='TIME UP - BLUE WINS!';
+  if(G.score[0]>G.score[1]) G.msg='TIME UP - ' + teamName(0).toUpperCase() + ' WINS!';
+  else if(G.score[1]>G.score[0]) G.msg='TIME UP - ' + teamName(1).toUpperCase() + ' WINS!';
   else G.msg='TIME UP - DRAW!';
   G.koTeam=0; G.over=true;
 }
@@ -1167,19 +1167,19 @@ function scoreGoal(team){
   G.score[team]++;
   G.goalN = (G.goalN||0) + 1;                        // gol sesi tetigi
   var lt = G.lastTouch;
-  var teamName = (team===0 ? 'RED' : 'BLUE');
+  var teamLabel = teamName(team).toUpperCase();
   var scorerTxt;
   if(lt && lt.team === team){
     scorerTxt = lt.name.toUpperCase() + ' SCORES!';
   } else if(lt){
     scorerTxt = 'OWN GOAL! ' + lt.name.toUpperCase();
   } else {
-    scorerTxt = teamName + ' SCORES!';
+    scorerTxt = teamLabel + ' SCORES!';
   }
   G.scorer = scorerTxt;
   if(maxGoals > 0 && G.score[team] >= maxGoals){
     G.phase='end'; G.ptimer=4000;
-    G.msg = scorerTxt + '  ·  ' + teamName + ' WINS THE MATCH!';
+    G.msg = scorerTxt + '  ·  ' + teamLabel + ' WINS THE MATCH!';
     G.koTeam = 0; // yeni mac hep kirmizi baslar
   } else {
     G.phase='goal'; G.ptimer=2200;
@@ -2197,8 +2197,8 @@ function render(v){
   if(v.ko && !v.pa && !v.m){
     ctx.fillStyle='rgba(27,33,37,0.55)';
     ctx.font='bold 15px Segoe UI, Arial'; ctx.textAlign='center';
-    var kn = v.kt===0 ? 'RED' : 'BLUE';
-    ctx.fillStyle = v.kt===0 ? '#E56E56' : '#5689E5';
+    var kn = teamNameOf(v, v.kt);
+    ctx.fillStyle = (v.tc && v.tc[v.kt]) ? v.tc[v.kt] : TEAM_COL[v.kt];
     ctx.fillText('Kick-off: ' + kn, W/2, PY0 - 12);
   }
   // duraklatma / geri sayim
@@ -2292,7 +2292,22 @@ var myStats = loadStats();
 var KIT_COLORS = ['#E56E56','#5689E5','#E5B356','#5FBF6B','#B06FD8','#3FC3C9','#EDEDED','#2E3439',
   '#D8452F','#2C5FBF','#F0862B','#8FD14F','#E5559B','#7A4FE0','#1FA88C','#C9A227',
   '#7E8C94','#5A3A22','#0E7C6B','#B31E3C','#26C6DA','#9CCC65','#FF8A65','#455A64'];
+var KIT_NAMES = ['Red','Blue','Amber','Green','Purple','Cyan','White','Charcoal',
+  'Crimson','Navy','Orange','Lime','Pink','Violet','Teal','Gold',
+  'Silver','Brown','Emerald','Ruby','Aqua','Olive','Coral','Slate'];
 var DEF_TEAM_COL = ['#E56E56', '#5689E5'];
+
+// Secilen forma rengine gore takim adi (RED/BLUE yerine gercek renk adi)
+function colName(hex){
+  var i = KIT_COLORS.indexOf(hex);
+  if(i >= 0 && KIT_NAMES[i]) return KIT_NAMES[i];
+  return 'Team';
+}
+function teamName(t){ return colName(TEAM_COL[t] || DEF_TEAM_COL[t]); }
+function teamNameOf(v, t){
+  var c = (v && v.tc && v.tc[t]) ? v.tc[t] : TEAM_COL[t];
+  return colName(c || DEF_TEAM_COL[t]).toUpperCase();
+}
 var TEAM_COL = ['#E56E56', '#5689E5'];      // aktif takim formalari (lobiden secilir)
 function cleanCol(c, dflt){
   return (typeof c==='string' && KIT_COLORS.indexOf(c)>=0) ? c : dflt;
@@ -2706,9 +2721,19 @@ function renderLobby(){
   var cols = { 0:el('colRed'), 1:el('colBlue'), 2:el('colSpec') };
   var hdrs = document.querySelectorAll ? document.querySelectorAll('.lobColHead') : [];
   if(hdrs && hdrs.length>=2){
-    if(hdrs[0]) hdrs[0].style.color = LOBBY.cfg.tc0 || DEF_TEAM_COL[0];
-    if(hdrs[2]) hdrs[2].style.color = LOBBY.cfg.tc1 || DEF_TEAM_COL[1];
+    // baslik hem secilen rengi hem de o rengin adini gosterir
+    if(hdrs[0]){
+      hdrs[0].style.color = LOBBY.cfg.tc0 || DEF_TEAM_COL[0];
+      hdrs[0].textContent = colName(LOBBY.cfg.tc0 || DEF_TEAM_COL[0]).toUpperCase();
+    }
+    if(hdrs[2]){
+      hdrs[2].style.color = LOBBY.cfg.tc1 || DEF_TEAM_COL[1];
+      hdrs[2].textContent = colName(LOBBY.cfg.tc1 || DEF_TEAM_COL[1]).toUpperCase();
+    }
   }
+  var jr = el('joinRedBtn'), jb = el('joinBlueBtn');
+  if(jr) jr.textContent = 'Join ' + colName(LOBBY.cfg.tc0 || DEF_TEAM_COL[0]);
+  if(jb) jb.textContent = 'Join ' + colName(LOBBY.cfg.tc1 || DEF_TEAM_COL[1]);
   cols[0].innerHTML=''; cols[1].innerHTML=''; cols[2].innerHTML='';
   LOBBY.roster.forEach(function(s){
     var row = document.createElement('div');
