@@ -385,7 +385,7 @@
       <label>Short ball power: <span id="gpaVal">100%</span></label>
       <input type="range" id="gpaInp" min="50" max="200" step="10" value="100">
       <label>Camera zoom: <span id="gzmVal">145%</span></label>
-      <input type="range" id="gzmInp" min="100" max="260" step="5" value="145">
+      <input type="range" id="gzmInp" min="45" max="260" step="5" value="145">
       <label>Ball weight: <span id="gbmVal">145%</span></label>
       <input type="range" id="gbmInp" min="50" max="600" step="10" value="220">
       <div id="cfgShare">
@@ -554,8 +554,35 @@ var CIRCLE_R = 70;                                  // orta yuvarlak yaricapi
 // KAMERA: tuval sabit boyutta kalir, kamera oyuncuyu takip eder
 var VIEW_W = 1240, VIEW_H = 580;                    // ekranda gorunen alan (tuval)
 var CAM = { x:500, y:270, zoom:1.45, init:false };
-var CAM_ZOOM_MIN = 1.0, CAM_ZOOM_MAX = 2.6;
-try { var _cz = parseFloat(localStorage.getItem('bc2d_zoom')); if(!isNaN(_cz)) CAM.zoom = Math.max(CAM_ZOOM_MIN, Math.min(CAM_ZOOM_MAX, _cz)); } catch(e){}
+var CAM_ZOOM_MIN = 0.45, CAM_ZOOM_MAX = 2.6;
+// 1 = tum saha, 4 = en yakin
+var CAM_PRESETS = [null, 'fit', 1.15, 1.45, 1.95];
+var camToast = { ms:0, txt:'' };
+
+// tum sahanin sigacagi zoom
+function fitZoom(){
+  return Math.max(CAM_ZOOM_MIN, Math.min(VIEW_W/(W+50), VIEW_H/(H+50)));
+}
+function setCamPreset(n){
+  n = Math.max(1, Math.min(4, n|0));
+  CAM.preset = n;
+  CAM.zoom = (CAM_PRESETS[n]==='fit') ? fitZoom() : CAM_PRESETS[n];
+  CAM.zoom = Math.max(CAM_ZOOM_MIN, Math.min(CAM_ZOOM_MAX, CAM.zoom));
+  try { localStorage.setItem('bc2d_campreset', String(n)); } catch(e){}
+  camToast.txt = (n===1 ? 'Camera 1 · Whole pitch' : 'Camera ' + n);
+  camToast.ms = 1100;
+  var zi = el('gzmInp');
+  if(zi){ zi.value = Math.round(CAM.zoom*100); var zv = el('gzmVal'); if(zv) zv.textContent = Math.round(CAM.zoom*100)+'%'; }
+}
+CAM.preset = 3;
+try {
+  var _cp = parseInt(localStorage.getItem('bc2d_campreset'),10);
+  if(_cp>=1 && _cp<=4) CAM.preset = _cp;
+  var _cz = parseFloat(localStorage.getItem('bc2d_zoom'));
+  if(!isNaN(_cz)) CAM.zoom = _cz;
+} catch(e){}
+// kademe secilmisse zoom kademenin degeri olsun ('fit' saha kurulunca hesaplanir)
+if(CAM.preset >= 2 && typeof CAM_PRESETS[CAM.preset] === 'number') CAM.zoom = CAM_PRESETS[CAM.preset];
 
 // Kamerayi hedefe yumusakca yaklastir ve saha disina tasmasini engelle
 function updateCamera(v){
@@ -644,6 +671,7 @@ function setField(fs){
   CIRCLE_R = Math.round((PY1-PY0)*0.17);
   applyCanvasRes(canvasRes / (window.devicePixelRatio || 1));
   CAM.init = false;
+  if(CAM.preset === 1) CAM.zoom = fitZoom();
   el('topBar').style.width=VIEW_W+'px';
   el('botBar').style.width=VIEW_W+'px';
   el('chatWrap').style.width=VIEW_W+'px';
@@ -2314,6 +2342,20 @@ function render(v){
     ctx.fillText(v.m, VIEW_W/2, VIEW_H/2+12);
   }
   // HUD
+  // kamera kademesi bildirimi
+  if(camToast.ms > 0){
+    camToast.ms -= 16.7;
+    var ta = Math.min(1, camToast.ms/350);
+    ctx.globalAlpha = Math.max(0, ta);
+    ctx.fillStyle = 'rgba(27,33,37,0.72)';
+    ctx.fillRect(VIEW_W/2-92, 12, 184, 28);
+    ctx.fillStyle = '#CDE6B4';
+    ctx.font = 'bold 13px Segoe UI, Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(camToast.txt, VIEW_W/2, 31);
+    ctx.globalAlpha = 1;
+  }
+
   // mini harita (sag alt): tum saha + oyuncular
   (function(){
     var mw = 148, mh = Math.round(mw * (H/W));
@@ -3242,6 +3284,15 @@ function keySet(e, down){
     e.preventDefault();
     return;
   }
+  // 1-4: kamera kademesi (baska bir eyleme atanmamissa)
+  if(down && !e.repeat && c.indexOf('Digit')===0){
+    var dn = parseInt(c.slice(5),10);
+    if(dn>=1 && dn<=4){
+      var used = false;
+      for(var bk in binds) if(binds[bk]===c) used = true;
+      if(!used){ setCamPreset(dn); e.preventDefault(); return; }
+    }
+  }
   if(c===binds.u){ keys.u=down; hit=true; }
   if(c===binds.d){ keys.d=down; hit=true; }
   if(c===binds.l){ keys.l=down; hit=true; }
@@ -3288,7 +3339,8 @@ function updateCtrlHint(){
     ' &nbsp;<span>Press</span> ' + K('press') +
     ' &nbsp;<span>Goalkeeper</span> ' + K('gkout') +
     ' &nbsp;<span>Lobby</span> ' + K('lobby') +
-    ' &nbsp;<span>Pause</span> ' + K('pause');
+    ' &nbsp;<span>Pause</span> ' + K('pause') +
+    ' &nbsp;<span>Camera</span> <b>1</b><b>2</b><b>3</b><b>4</b>';
 }
 
 function renderKeyRows(){
@@ -3556,6 +3608,7 @@ el('ggcInp').oninput = applyLive;
 el('ggkInp').oninput = applyLive;
 el('gbmInp').oninput = applyLive;
 el('gzmInp').oninput = function(){
+  CAM.preset = 0;                       // elle ayar: kademe disi
   var z = parseInt(this.value,10)/100;
   CAM.zoom = Math.max(CAM_ZOOM_MIN, Math.min(CAM_ZOOM_MAX, z));
   el('gzmVal').textContent = Math.round(CAM.zoom*100)+'%';
