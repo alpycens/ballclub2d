@@ -382,6 +382,8 @@
       <input type="range" id="ggkInp" min="60" max="180" step="10" value="100">
       <label>Short ball power: <span id="gpaVal">100%</span></label>
       <input type="range" id="gpaInp" min="50" max="200" step="10" value="100">
+      <label>Camera zoom: <span id="gzmVal">145%</span></label>
+      <input type="range" id="gzmInp" min="100" max="260" step="5" value="145">
       <label>Ball weight: <span id="gbmVal">145%</span></label>
       <input type="range" id="gbmInp" min="50" max="600" step="10" value="220">
       <div id="cfgShare">
@@ -547,6 +549,32 @@ var ROLE_TR = { gk:'Goalkeeper', def:'Defender', mid:'Midfielder', fwd:'Forward'
 var matchMins = 0;                                  // 0 = suresiz
 var PEN_W = 114, PEN_EXT = 45;                      // ceza sahasi: derinlik ve kale ustu/alti tasma
 var CIRCLE_R = 70;                                  // orta yuvarlak yaricapi
+// KAMERA: tuval sabit boyutta kalir, kamera oyuncuyu takip eder
+var VIEW_W = 1000, VIEW_H = 540;                    // ekranda gorunen alan (tuval)
+var CAM = { x:500, y:270, zoom:1.45, init:false };
+var CAM_ZOOM_MIN = 1.0, CAM_ZOOM_MAX = 2.6;
+try { var _cz = parseFloat(localStorage.getItem('bc2d_zoom')); if(!isNaN(_cz)) CAM.zoom = Math.max(CAM_ZOOM_MIN, Math.min(CAM_ZOOM_MAX, _cz)); } catch(e){}
+
+// Kamerayi hedefe yumusakca yaklastir ve saha disina tasmasini engelle
+function updateCamera(v){
+  var tx = null, ty = null;
+  if(v && v.p){
+    for(var i=0;i<v.p.length;i++) if(v.p[i].i===myPid){ tx=v.p[i].x; ty=v.p[i].y; break; }
+  }
+  if(tx===null && v && v.b){ tx = v.b[0]; ty = v.b[1]; }        // oyuncum yoksa topu izle
+  if(tx===null){ tx = W/2; ty = H/2; }
+  // topa dogru hafif kaydir (onunu gor)
+  if(v && v.b){ tx = tx*0.78 + v.b[0]*0.22; ty = ty*0.78 + v.b[1]*0.22; }
+  if(!CAM.init){ CAM.x=tx; CAM.y=ty; CAM.init=true; }
+  else { CAM.x += (tx-CAM.x)*0.12; CAM.y += (ty-CAM.y)*0.12; }
+  // gorunen dunya olcusu
+  var halfW = (VIEW_W/2)/CAM.zoom, halfH = (VIEW_H/2)/CAM.zoom;
+  var mx = 26, my = 26;                                          // saha disinda birak
+  if(W + mx*2 <= halfW*2) CAM.x = W/2;
+  else CAM.x = Math.max(halfW - mx, Math.min(W - halfW + mx, CAM.x));
+  if(H + my*2 <= halfH*2) CAM.y = H/2;
+  else CAM.y = Math.max(halfH - my, Math.min(H - halfH + my, CAM.y));
+}
 var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, gPass:1, bMass:2.2, tc0:'#E56E56', tc1:'#5689E5', cap0:null, cap1:null }, started:false };
 var DIFF_NAMES = ['Beginner','Intermediate','Advanced','Expert','Master'];
 var DIFFS = [
@@ -589,12 +617,12 @@ function applyCanvasRes(scaleK){
   var dpr = (window.devicePixelRatio || 1);
   var r = Math.max(1, Math.min(3, dpr * (scaleK || 1)));
   canvasRes = r;
-  var bw = Math.round(W*r), bh = Math.round(H*r);
+  var bw = Math.round(VIEW_W*r), bh = Math.round(VIEW_H*r);
   if(cv.width !== bw || cv.height !== bh){
     cv.width = bw; cv.height = bh;
   }
-  cv.style.width = W+'px';
-  cv.style.height = H+'px';
+  cv.style.width = VIEW_W+'px';
+  cv.style.height = VIEW_H+'px';
   if(ctx){
     ctx.setTransform(r,0,0,r,0,0);
     ctx.imageSmoothingEnabled = true;
@@ -613,10 +641,11 @@ function setField(fs){
   PEN_EXT = Math.round(GOAL_H*0.3);
   CIRCLE_R = Math.round((PY1-PY0)*0.17);
   applyCanvasRes(canvasRes / (window.devicePixelRatio || 1));
-  el('topBar').style.width=W+'px';
-  el('botBar').style.width=W+'px';
-  el('chatWrap').style.width=W+'px';
-  var gs=el('gameScale'); if(gs) gs.style.width=W+'px';
+  CAM.init = false;
+  el('topBar').style.width=VIEW_W+'px';
+  el('botBar').style.width=VIEW_W+'px';
+  el('chatWrap').style.width=VIEW_W+'px';
+  var gs=el('gameScale'); if(gs) gs.style.width=VIEW_W+'px';
 }
 
 /* ================= YARDIMCI ================= */
@@ -2146,8 +2175,16 @@ function pollKickSounds(v){
 function render(v){
   pollGoalSound(v);
   pollKickSounds(v);
-  ctx.clearRect(0,0,W,H);
+  updateCamera(v);
+  ctx.clearRect(0,0,VIEW_W,VIEW_H);
   ctx.lineJoin='round'; ctx.lineCap='round';
+  // saha disi zemin
+  ctx.fillStyle='#4A6140'; ctx.fillRect(0,0,VIEW_W,VIEW_H);
+  // ---- DUNYA KATMANI (kamera) ----
+  ctx.save();
+  ctx.translate(VIEW_W/2, VIEW_H/2);
+  ctx.scale(CAM.zoom, CAM.zoom);
+  ctx.translate(-CAM.x, -CAM.y);
   // saha
   ctx.fillStyle='#718C5A'; ctx.fillRect(0,0,W,H);
   // koyu şerit doku
@@ -2226,12 +2263,14 @@ function render(v){
     ctx.fillStyle = (v.tc && v.tc[v.kt]) ? v.tc[v.kt] : TEAM_COL[v.kt];
     ctx.fillText('Kick-off: ' + kn, W/2, PY0 - 12);
   }
+  ctx.restore();   // ---- EKRAN KATMANI (HUD) ----
+
   // duraklatma / geri sayim
   if(v.pa){
     var ri = v.ri || 0;
     var dim = ri > 0 ? 0.30 + 0.30*(ri/2000) : 0.60;      // geri sayimda perde yavasca acilir
     ctx.fillStyle = 'rgba(27,33,37,' + dim.toFixed(3) + ')';
-    ctx.fillRect(0,0,W,H);
+    ctx.fillRect(0,0,VIEW_W,VIEW_H);
     ctx.textAlign='center';
     if(ri > 0){
       var secs = Math.ceil(ri/1000);                      // 2 -> 1
@@ -2240,7 +2279,7 @@ function render(v){
       var scale = 1.6 - 0.6*frac;
       var alpha = 1 - 0.35*frac;
       ctx.save();
-      ctx.translate(W/2, H/2);
+      ctx.translate(VIEW_W/2, VIEW_H/2);
       ctx.scale(scale, scale);
       ctx.globalAlpha = alpha;
       ctx.fillStyle = '#FFFFFF';
@@ -2255,12 +2294,12 @@ function render(v){
       ctx.globalAlpha = 1;
       ctx.fillStyle = '#CDE6B4';
       ctx.font = 'bold 16px Segoe UI, Arial';
-      ctx.fillText('GET READY', W/2, H/2 + 78);
+      ctx.fillText('GET READY', VIEW_W/2, VIEW_H/2 + 78);
     } else {
       ctx.fillStyle='#FFFFFF'; ctx.font='bold 34px Segoe UI, Arial';
-      ctx.fillText('PAUSED', W/2, H/2+12);
+      ctx.fillText('PAUSED', VIEW_W/2, VIEW_H/2+12);
       ctx.fillStyle='#9FB3BB'; ctx.font='13px Segoe UI, Arial';
-      ctx.fillText('Press P to resume', W/2, H/2+42);
+      ctx.fillText('Press P to resume', VIEW_W/2, VIEW_H/2+42);
     }
   }
   var pb2 = el('pauseBtn2');
@@ -2268,11 +2307,47 @@ function render(v){
   // mesaj
   if(v.m && !v.pa){
     ctx.fillStyle='rgba(27,33,37,0.75)';
-    ctx.fillRect(0, H/2-42, W, 84);
+    ctx.fillRect(0, VIEW_H/2-42, VIEW_W, 84);
     ctx.fillStyle='#FFFFFF'; ctx.font='bold 34px Segoe UI, Arial'; ctx.textAlign='center';
-    ctx.fillText(v.m, W/2, H/2+12);
+    ctx.fillText(v.m, VIEW_W/2, VIEW_H/2+12);
   }
   // HUD
+  // mini harita (sag alt): tum saha + oyuncular
+  (function(){
+    var mw = 148, mh = Math.round(mw * (H/W));
+    var mx = VIEW_W - mw - 12, my = VIEW_H - mh - 12;
+    var sx = mw/W, sy = mh/H;
+    ctx.globalAlpha = 0.82;
+    ctx.fillStyle = '#1B2125';
+    ctx.fillRect(mx-3, my-3, mw+6, mh+6);
+    ctx.fillStyle = '#5E7A4D';
+    ctx.fillRect(mx, my, mw, mh);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
+    ctx.strokeRect(mx + PX0*sx, my + PY0*sy, (PX1-PX0)*sx, (PY1-PY0)*sy);
+    ctx.beginPath();
+    ctx.moveTo(mx + (W/2)*sx, my + PY0*sy); ctx.lineTo(mx + (W/2)*sx, my + PY1*sy); ctx.stroke();
+    // kaleler
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillRect(mx + PX0*sx - 2, my + GY0*sy, 3, (GY1-GY0)*sy);
+    ctx.fillRect(mx + PX1*sx - 1, my + GY0*sy, 3, (GY1-GY0)*sy);
+    // oyuncular
+    for(var i=0;i<v.p.length;i++){
+      var q = v.p[i];
+      ctx.fillStyle = (v.tc && v.tc[q.t]) ? v.tc[q.t] : TEAM_COL[q.t];
+      var r = (q.i===myPid) ? 3.4 : 2.4;
+      ctx.beginPath(); ctx.arc(mx + q.x*sx, my + q.y*sy, r, 0, Math.PI*2); ctx.fill();
+      if(q.i===myPid){ ctx.strokeStyle='#FFFFFF'; ctx.lineWidth=1.2; ctx.stroke(); }
+    }
+    // top
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.arc(mx + v.b[0]*sx, my + v.b[1]*sy, 2.2, 0, Math.PI*2); ctx.fill();
+    // kamera cercevesi
+    var halfW = (VIEW_W/2)/CAM.zoom, halfH = (VIEW_H/2)/CAM.zoom;
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;
+    ctx.strokeRect(mx + (CAM.x-halfW)*sx, my + (CAM.y-halfH)*sy, halfW*2*sx, halfH*2*sy);
+    ctx.globalAlpha = 1;
+  })();
+
   el('scR').textContent=v.s[0]; el('scB').textContent=v.s[1];
   var dots = document.querySelectorAll ? null : null;
   var tcs = (v.tc && v.tc.length===2) ? v.tc : TEAM_COL;
@@ -3406,6 +3481,8 @@ function syncPanel(){
   el('ggsInp').value=gs; el('ggsVal').textContent=gs+'%';
   el('ggcInp').value=gc; el('ggcVal').textContent=gc+'%';
   el('ggkInp').value=gk; el('ggkVal').textContent=gk+'%';
+  var cz = Math.round(CAM.zoom*100);
+  el('gzmInp').value=cz; el('gzmVal').textContent=cz+'%';
   var gp2 = Math.round(G_PASS*100);
   el('gpaInp').value=gp2; el('gpaVal').textContent=gp2+'%';
   var bm2 = Math.round(BALL_MASS*100);
@@ -3456,6 +3533,12 @@ el('ggsInp').oninput = applyLive;
 el('ggcInp').oninput = applyLive;
 el('ggkInp').oninput = applyLive;
 el('gbmInp').oninput = applyLive;
+el('gzmInp').oninput = function(){
+  var z = parseInt(this.value,10)/100;
+  CAM.zoom = Math.max(CAM_ZOOM_MIN, Math.min(CAM_ZOOM_MAX, z));
+  el('gzmVal').textContent = Math.round(CAM.zoom*100)+'%';
+  try { localStorage.setItem('bc2d_zoom', String(CAM.zoom)); } catch(e){}
+};
 el('gpaInp').oninput = applyLive;
 el('cfgExportBtn').onclick = exportGameCfg;
 
