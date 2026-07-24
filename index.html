@@ -639,7 +639,7 @@ function buildGameFromRoster(){
   applyCfgLocal();
   G = { players:[], ball:{x:W/2,y:H/2,vx:0,vy:0,cw:null,ct:0,cd:null,spin:0,kickGrace:0}, score:[0,0],
         phase:'play', ptimer:0, msg:'', over:false, paused:false,
-        koTeam:0, ko:true, t:0, clock:0, lastTouch:null, goalN:0 };
+        koTeam:0, ko:true, t:0, clock:0, lastTouch:null, goalN:0, resumeIn:0 };
   LOBBY.roster.forEach(function(s){
     if(s.team!==0 && s.team!==1) return;          // seyirci sahada degil
     var p = newPlayer(s.id, s.name, s.team, !!s.bot, s.bot ? null : s.stats);
@@ -1125,6 +1125,18 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
   if(play){
     if(ball.x < PX0-BR && inMouth) scoreGoal(1);      // sol kaleye girdi -> mavi
     else if(ball.x > PX1+BR && inMouth) scoreGoal(0); // sağ kaleye -> kırmızı
+  }
+}
+
+// Duraklatma: durdurma aninda gerceklesir, DEVAM ise 2 saniyelik geri sayimla olur.
+function togglePause(){
+  if(!G) return;
+  if(G.paused){
+    if(G.resumeIn > 0){ G.resumeIn = 0; return; }   // geri sayimi iptal et (duraklatilmis kal)
+    G.resumeIn = 2000;                              // devam: geri sayim basliyor
+  } else {
+    G.paused = true;
+    G.resumeIn = 0;
   }
 }
 
@@ -1785,7 +1797,7 @@ function hostOnData(conn, msg){
       if(typeof msg.sp==='number') LOBBY.cfg.spdP = SPD_P;
       if(typeof msg.sb==='number') LOBBY.cfg.spdB = SPD_B;
       saveGameCfg(); pushLobby();
-      if(msg.tp) G.paused = !G.paused;
+      if(msg.tp) togglePause();
     }
   } else if(msg.t==='chat'){
     var cp = G.players.find(function(q){return q.id===conn.peer;});
@@ -1833,7 +1845,7 @@ function broadcast(){
         ks:p.kickN||0, kw:p.kickPow||0 }; }),
     b: [Math.round(G.ball.x*10)/10, Math.round(G.ball.y*10)/10],
     s: G.score, ph: G.phase, m: G.msg, pa: G.paused?1:0, cf:[SPD_P,SPD_B,BOT_DIFF,BOT_STYLE[0],BOT_STYLE[1],G_SPRINT,G_CURVE,G_SHOT,BALL_MASS,G_PASS],
-    ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam, ck: Math.round(G.clock), mm: matchMins, gn: G.goalN||0, tc:[TEAM_COL[0],TEAM_COL[1]] };
+    ko: (G.ko && G.phase==='play')?1:0, kt: G.koTeam, ck: Math.round(G.clock), mm: matchMins, gn: G.goalN||0, tc:[TEAM_COL[0],TEAM_COL[1]], ri: Math.max(0, Math.round(G.resumeIn||0)) };
   for(var k in conns){ try{ conns[k].send(st); }catch(e){} }
 }
 
@@ -1904,7 +1916,13 @@ function loop(now){
   if(!running) return;
   var dtms = Math.min(50, now - lastT); lastT = now;
   if(role==='host'){
-    if(G.paused){ acc = 0; }
+    if(G.paused){
+      acc = 0;
+      if(G.resumeIn > 0){
+        G.resumeIn -= dtms;
+        if(G.resumeIn <= 0){ G.resumeIn = 0; G.paused = false; }   // oyun akmaya baslar
+      }
+    }
     else {
       acc += dtms;
       while(acc >= TICK_MS){ stepGame(1); acc -= TICK_MS; }
@@ -1926,7 +1944,7 @@ function loop(now){
       }
       Gr.p = Gr.p.filter(function(rp){ return G.p.some(function(tp){return tp.i===rp.i;}); });
       Gr.b[0] += (G.b[0]-Gr.b[0])*t; Gr.b[1] += (G.b[1]-Gr.b[1])*t;
-      Gr.s=G.s; Gr.ph=G.ph; Gr.m=G.m; Gr.pa=G.pa; Gr.ko=G.ko; Gr.kt=G.kt; Gr.ck=G.ck; Gr.mm=G.mm; Gr.gn=G.gn; Gr.tc=G.tc;
+      Gr.s=G.s; Gr.ph=G.ph; Gr.m=G.m; Gr.pa=G.pa; Gr.ko=G.ko; Gr.kt=G.kt; Gr.ck=G.ck; Gr.mm=G.mm; Gr.gn=G.gn; Gr.tc=G.tc; Gr.ri=G.ri;
       render(Gr);
     }
   }
@@ -1936,7 +1954,7 @@ function loop(now){
 function hostView(){
   return { p: G.players.map(function(p){return {i:p.id,n:p.name,t:p.team,b:p.bot?1:0,x:p.x,y:p.y,st:Math.round(100*p.stamina/(p.maxStam||STAM_MAX)),lk:p.lock?1:0,fl:(p.flash>0||p.glow)?1:0,kp:(p.keeper&&p.bot)?1:0,sr:p.spr?1:0,kn:(p.kit&&p.kit.num)||0,ks:p.kickN||0,kw:p.kickPow||0};}),
            b:[G.ball.x,G.ball.y], s:G.score, ph:G.phase, m:G.msg, pa:G.paused?1:0,
-           ko:(G.ko && G.phase==='play')?1:0, kt:G.koTeam, ck:Math.round(G.clock), mm:matchMins, gn:G.goalN||0, tc:[TEAM_COL[0],TEAM_COL[1]] };
+           ko:(G.ko && G.phase==='play')?1:0, kt:G.koTeam, ck:Math.round(G.clock), mm:matchMins, gn:G.goalN||0, tc:[TEAM_COL[0],TEAM_COL[1]], ri:Math.max(0, Math.round(G.resumeIn||0)) };
 }
 
 function kitLum(hex){
@@ -2144,15 +2162,45 @@ function render(v){
     ctx.fillStyle = v.kt===0 ? '#E56E56' : '#5689E5';
     ctx.fillText('Başlama vuruşu: ' + kn, W/2, PY0 - 12);
   }
-  // duraklatma
+  // duraklatma / geri sayim
   if(v.pa){
-    ctx.fillStyle='rgba(27,33,37,0.6)';
+    var ri = v.ri || 0;
+    var dim = ri > 0 ? 0.30 + 0.30*(ri/2000) : 0.60;      // geri sayimda perde yavasca acilir
+    ctx.fillStyle = 'rgba(27,33,37,' + dim.toFixed(3) + ')';
     ctx.fillRect(0,0,W,H);
-    ctx.fillStyle='#FFFFFF'; ctx.font='bold 34px Segoe UI, Arial'; ctx.textAlign='center';
-    ctx.fillText('MAÇ DURDURULDU', W/2, H/2+12);
+    ctx.textAlign='center';
+    if(ri > 0){
+      var secs = Math.ceil(ri/1000);                      // 2 -> 1
+      var frac = 1 - ((ri % 1000) / 1000);                // saniye icindeki ilerleme 0..1
+      // rakam: buyuk gelir, kuculur ve solar (haxball tarzi)
+      var scale = 1.6 - 0.6*frac;
+      var alpha = 1 - 0.35*frac;
+      ctx.save();
+      ctx.translate(W/2, H/2);
+      ctx.scale(scale, scale);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 64px Segoe UI, Arial';
+      ctx.fillText(String(secs), 0, 22);
+      // genisleyen halka
+      ctx.globalAlpha = (1-frac) * 0.55;
+      ctx.strokeStyle = '#CDE6B4';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, 46 + frac*34, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#CDE6B4';
+      ctx.font = 'bold 16px Segoe UI, Arial';
+      ctx.fillText('BAŞLIYOR', W/2, H/2 + 78);
+    } else {
+      ctx.fillStyle='#FFFFFF'; ctx.font='bold 34px Segoe UI, Arial';
+      ctx.fillText('MAÇ DURDURULDU', W/2, H/2+12);
+      ctx.fillStyle='#9FB3BB'; ctx.font='13px Segoe UI, Arial';
+      ctx.fillText('Devam etmek için P veya Ayarlar > Maçı Devam Ettir', W/2, H/2+42);
+    }
   }
   var pb2 = el('pauseBtn2');
-  pb2.textContent = v.pa ? 'Maçı Devam Ettir' : 'Maçı Durdur';
+  pb2.textContent = v.pa ? ((v.ri||0) > 0 ? 'Başlıyor...' : 'Maçı Devam Ettir') : 'Maçı Durdur';
   // mesaj
   if(v.m && !v.pa){
     ctx.fillStyle='rgba(27,33,37,0.75)';
@@ -2981,7 +3029,7 @@ function keySet(e, down){
     return;
   }
   if(c===binds.pause && down && !e.repeat && running && role==='host' && G){
-    G.paused = !G.paused;
+    togglePause();
     e.preventDefault();
     return;
   }
@@ -3342,7 +3390,7 @@ el('cfgFile').onchange = function(){
 loadSharedConfig();
 
 el('pauseBtn2').onclick = function(){
-  if(role==='host'){ G.paused = !G.paused; }
+  if(role==='host'){ togglePause(); }
   else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, tp:1}); }
 };
 
