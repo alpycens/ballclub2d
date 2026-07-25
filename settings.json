@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": 1785020301717,
+  "updated": 1785023054819,
   "spdP": 0.5,
   "spdB": 0.5,
   "gSprint": 1,
@@ -8,7 +8,7 @@
   "gShot": 1.1,
   "bMass": 6,
   "diff": 4,
-  "gPass": 0.8,
+  "gPass": 1.1,
   "tc0": "#5FBF6B",
   "tc1": "#FF8A65",
   "botStats": {
@@ -19,7 +19,8 @@
         "sprint": 2,
         "drib": 1,
         "power": 3,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "def": {
         "shot": 2,
@@ -27,7 +28,8 @@
         "sprint": 2,
         "drib": 2,
         "power": 3,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "mid": {
         "shot": 2,
@@ -35,7 +37,8 @@
         "sprint": 2,
         "drib": 3,
         "power": 2,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "fwd": {
         "shot": 3,
@@ -43,7 +46,8 @@
         "sprint": 3,
         "drib": 2,
         "power": 1,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       }
     },
     "1": {
@@ -53,7 +57,8 @@
         "sprint": 3,
         "drib": 2,
         "power": 4,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "def": {
         "shot": 3,
@@ -61,7 +66,8 @@
         "sprint": 3,
         "drib": 3,
         "power": 4,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "mid": {
         "shot": 3,
@@ -69,7 +75,8 @@
         "sprint": 3,
         "drib": 4,
         "power": 3,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "fwd": {
         "shot": 4,
@@ -77,7 +84,8 @@
         "sprint": 4,
         "drib": 3,
         "power": 2,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       }
     },
     "2": {
@@ -87,7 +95,8 @@
         "sprint": 3,
         "drib": 2,
         "power": 4,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "def": {
         "shot": 3,
@@ -95,7 +104,8 @@
         "sprint": 3,
         "drib": 3,
         "power": 4,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "mid": {
         "shot": 3,
@@ -103,7 +113,8 @@
         "sprint": 3,
         "drib": 4,
         "power": 3,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "fwd": {
         "shot": 4,
@@ -111,7 +122,8 @@
         "sprint": 4,
         "drib": 3,
         "power": 2,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       }
     },
     "3": {
@@ -121,7 +133,8 @@
         "sprint": 4,
         "drib": 3,
         "power": 5,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "def": {
         "shot": 4,
@@ -129,7 +142,8 @@
         "sprint": 4,
         "drib": 4,
         "power": 5,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "mid": {
         "shot": 4,
@@ -137,7 +151,8 @@
         "sprint": 4,
         "drib": 5,
         "power": 4,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "fwd": {
         "shot": 5,
@@ -145,7 +160,8 @@
         "sprint": 5,
         "drib": 4,
         "power": 3,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       }
     },
     "4": {
@@ -155,7 +171,8 @@
         "sprint": 4,
         "drib": 3,
         "power": 5,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "def": {
         "shot": 4,
@@ -163,7 +180,8 @@
         "sprint": 4,
         "drib": 4,
         "power": 5,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "mid": {
         "shot": 4,
@@ -171,7 +189,8 @@
         "sprint": 4,
         "drib": 5,
         "power": 4,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       },
       "fwd": {
         "shot": 5,
@@ -179,7 +198,8 @@
         "sprint": 5,
         "drib": 4,
         "power": 3,
-        "energy": 5
+        "energy": 5,
+        "ftouch": 5
       }
     }
   }
