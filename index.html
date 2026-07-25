@@ -84,9 +84,20 @@
   #pauseBtn2 { background:#7A5C2E; }
   #pauseBtn2:hover { background:#8F6C36; }
   #topBar { width:1000px; display:flex; align-items:center; justify-content:space-between;
-            background:#252E33; border:1px solid #3C4A52; border-bottom:none;
-            border-radius:8px 8px 0 0; padding:6px 14px; }
-  #scoreBox { font-size:18px; font-weight:700; display:flex; align-items:center; gap:10px; }
+            position:relative;
+            background:rgba(37,46,51,0.30); border:1px solid rgba(60,74,82,0.5); border-bottom:none;
+            border-radius:8px 8px 0 0; padding:6px 14px; backdrop-filter:blur(2px);
+            transition:background .15s, border-color .15s; }
+  #topBar:hover { background:rgba(37,46,51,0.72); border-color:rgba(96,116,128,0.7); }
+  #scoreBox { font-size:18px; font-weight:700; display:flex; align-items:center; gap:10px;
+              position:absolute; left:50%; transform:translateX(-50%);
+              text-shadow:0 1px 3px rgba(0,0,0,0.8); }
+  #hudKeys { font-size:10.5px; color:#9FB3BB; line-height:1.4; white-space:nowrap;
+             display:flex; align-items:center; text-shadow:0 1px 2px rgba(0,0,0,0.75); }
+  #hudKeys b { display:inline-block; min-width:12px; padding:0 4px; margin:0 3px 0 9px;
+               background:rgba(27,33,37,0.6); border:1px solid #4C5E68; border-radius:3px;
+               color:#E5B356; font-family:monospace; font-weight:700; font-size:10px; }
+  #hudKeys b:first-child { margin-left:0; }
   .tdot { width:12px; height:12px; border-radius:50%; display:inline-block; }
   #roomInfo { font-size:12px; color:#9FB3BB; user-select:all; }
   canvas { background:#5E7A4D; display:block; border:1px solid #3C4A52; }
@@ -103,16 +114,21 @@
                 color:#E5B356; font-family:monospace; font-weight:700; font-size:10.5px; }
   #ctrlHint span { color:#8FA0A8; }
   #stamWrap { flex:0 0 auto; }
-  #chatWrap { width:1000px; margin-top:8px; background:#252E33; border:1px solid #3C4A52;
+  #chatWrap { width:1000px; margin-top:8px; background:rgba(37,46,51,0.14);
+              border:1px solid rgba(60,74,82,0.55); backdrop-filter:blur(2px);
+              transition:background .15s, border-color .15s;
               border-radius:8px; padding:8px 12px; }
   #chatLog { height:86px; overflow-y:auto; font-size:13px; line-height:1.45;
+             text-shadow:0 1px 2px rgba(0,0,0,0.7);
              margin-bottom:6px; scrollbar-width:thin; }
   #chatLog .cn { font-weight:700; }
   #chatLog .cn.t0 { color:#E8E8E8; }
   #chatLog .cn.t1 { color:#E8E8E8; }
   #chatLog .sys { color:#8FA0A8; font-style:italic; font-size:12px; }
   #chatRow { display:flex; gap:8px; }
-  #chatInp { flex:1; padding:7px 10px; background:#1B2125; color:#E8E8E8;
+  #chatWrap:hover, #chatWrap:focus-within { background:rgba(37,46,51,0.82);
+              border-color:rgba(96,116,128,0.8); }
+  #chatInp { flex:1; padding:7px 10px; background:rgba(27,33,37,0.55); color:#E8E8E8;
              border:1px solid #3C4A52; border-radius:4px; font-size:13px; outline:none; }
   #chatInp:focus { border-color:#CDE6B4; }
   #chatSend { flex:0 0 auto; width:90px; padding:7px 0; font-size:13px; }
@@ -132,7 +148,9 @@
   body.fsmode #botBar { position:absolute; bottom:0; left:0; z-index:5;
     background:rgba(37,46,51,0.82); border:none; border-radius:0; backdrop-filter:blur(2px); }
   body.fsmode #chatWrap { position:absolute; left:10px; bottom:58px; z-index:4;
-    background:rgba(37,46,51,0.78); border-color:#3C4A52; }
+    background:rgba(37,46,51,0.12); border-color:rgba(60,74,82,0.4); }
+  body.fsmode #chatWrap:hover, body.fsmode #chatWrap:focus-within {
+    background:rgba(37,46,51,0.78); border-color:rgba(96,116,128,0.8); }
   body.fsmode #chatLog { height:70px; }
   body.fsmode #cv { display:block; }
   html:fullscreen, html:-webkit-full-screen { background:#1B2125; }
@@ -352,6 +370,7 @@
 <div id="gameWrap">
  <div id="gameScale">
   <div id="topBar">
+    <div id="hudKeys"></div>
     <div id="scoreBox">
       <span class="tdot" id="dotR" style="background:#E56E56"></span><span id="scR">0</span>
       <span style="color:#6E8089">-</span>
@@ -3309,6 +3328,11 @@ function keySet(e, down){
     return;
   }
   var hit=false;
+  // F: tam ekran ac/kapat (baska bir eyleme atanmamissa)
+  if(c==='KeyF' && down && !e.repeat){
+    var fUsed=false; for(var fk in binds) if(binds[fk]==='KeyF') fUsed=true;
+    if(!fUsed){ toggleFs(); e.preventDefault(); return; }
+  }
   // ESC: lobiyi ac/kapa · P: maci durdur/devam ettir (oyunu kuran kisi)
   if(c===binds.lobby && down && !e.repeat && running){
     toggleLobbyView();
@@ -3377,6 +3401,16 @@ function updateCtrlHint(){
     ' &nbsp;<span>Lobby</span> ' + K('lobby') +
     ' &nbsp;<span>Pause</span> ' + K('pause') +
     ' &nbsp;<span>Camera</span> <b>1</b><b>2</b><b>3</b><b>4</b>';
+  updateHudKeys();
+}
+
+function updateHudKeys(){
+  var e = el('hudKeys'); if(!e) return;
+  e.innerHTML =
+    '<b>F</b>Fullscreen' +
+    '<b>' + keyLabelShort(binds.lobby) + '</b>Lobby' +
+    '<b>' + keyLabelShort(binds.pause) + '</b>Pause' +
+    '<b>Enter</b>Chat';
 }
 
 function renderKeyRows(){
@@ -3713,7 +3747,7 @@ el('sndBtn').onclick = function(){
 };
 updateSndBtn();
 
-el('fsBtn').onclick = function(){
+function toggleFs(){
   var el0 = document.documentElement;
   var req = el0.requestFullscreen || el0.webkitRequestFullscreen || el0.mozRequestFullScreen || el0.msRequestFullscreen;
   var exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
@@ -3722,7 +3756,8 @@ el('fsBtn').onclick = function(){
     else { if(exit) exit.call(document); }
   } catch(e){}
   refitSoon();
-};
+}
+el('fsBtn').onclick = toggleFs;
 
 function toggleLobbyView(){
   if(el('lobby').style.display === 'block'){
