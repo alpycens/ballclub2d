@@ -3230,7 +3230,7 @@ function renderStatRadar(hostId){
   var labs = ['Shoot','Curve','Sprint','Dribbling','Strength','Stamina','First touch'];
   var cx=100, cy=100, R=60, n=STAT_KEYS.length;
   function pt(i, r){ var a=-Math.PI/2 + i*2*Math.PI/n; return [cx+Math.cos(a)*r, cy+Math.sin(a)*r]; }
-  var s='<svg viewBox="0 0 200 200" class="statRadar" preserveAspectRatio="xMidYMid meet">';
+  var s='<svg viewBox="-18 -2 236 204" class="statRadar" preserveAspectRatio="xMidYMid meet">';
   for(var g=1; g<=4; g++){
     var rr=R*g/4, path='';
     for(var i=0;i<n;i++){ var p=pt(i,rr); path += (i?' L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1); }
@@ -3242,9 +3242,9 @@ function renderStatRadar(hostId){
   s += '<path d="'+poly+' Z" fill="rgba(229,179,86,0.32)" stroke="#E5B356" stroke-width="2" stroke-linejoin="round"/>';
   for(var i=0;i<n;i++){ var r=R*(0.10 + 0.90*(vals[i]-STAT_MIN)/(STAT_MAX-STAT_MIN)); var p=pt(i,r); s += '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.4" fill="#E5B356"/>'; }
   for(var i=0;i<n;i++){
-    var lp=pt(i,R+16);
+    var lp=pt(i,R+13);
     var anch = (lp[0] < cx-6) ? 'end' : (lp[0] > cx+6 ? 'start' : 'middle');
-    s += '<text x="'+lp[0].toFixed(1)+'" y="'+(lp[1]+3).toFixed(1)+'" text-anchor="'+anch+'" font-size="9.5" font-weight="700" fill="#B7C6CD">'+labs[i]+'</text>';
+    s += '<text x="'+lp[0].toFixed(1)+'" y="'+(lp[1]+3).toFixed(1)+'" text-anchor="'+anch+'" font-size="9" font-weight="700" fill="#B7C6CD">'+labs[i]+'</text>';
   }
   s += '</svg>';
   host.innerHTML = s;
