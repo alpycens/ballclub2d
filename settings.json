@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": 1784876049884,
+  "updated": 1785020301717,
   "spdP": 0.5,
   "spdB": 0.5,
   "gSprint": 1,
@@ -8,9 +8,9 @@
   "gShot": 1.1,
   "bMass": 6,
   "diff": 4,
-  "gPass": 1.1,
-  "tc0": "#E5559B",
-  "tc1": "#26C6DA",
+  "gPass": 0.8,
+  "tc0": "#5FBF6B",
+  "tc1": "#FF8A65",
   "botStats": {
     "0": {
       "gk": {
