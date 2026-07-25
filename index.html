@@ -270,12 +270,14 @@
   .posDot { transition:transform .12s ease; transform-origin:center; transform-box:fill-box; }
   .posDot.pick:hover circle { stroke:#CDE6B4; }
   .posDot.pick:hover { transform:scale(1.15); }
+  .posDot.bdrag { cursor:grab; touch-action:none; }
+  .posDot.bdrag:hover circle { stroke:#E5B356; }
   .posHint { font-size:10.5px; color:#8FA0A8; margin-top:5px; text-align:center; }
 
   /* ==== PES tarzi stat radari ==== */
   .statRadarBox { display:flex; justify-content:center; margin:6px 0 2px; }
-  .statRadar { width:150px; max-width:100%; height:auto; }
-  #lstatRadar .statRadar { width:170px; }
+  .statRadar { width:190px; max-width:100%; height:auto; }
+  #lstatRadar .statRadar { width:210px; }
 
   /* ==== Lobi cilasi: yumusak paneller, gecisler ==== */
   #lobby { color:#E8ECEE; }
@@ -352,9 +354,11 @@
       <div id="lstatRadar" class="statRadarBox"></div>
       <button id="lstatReset">Reset (all 5)</button>
     </div>
-    <div class="cfgItem sideItem"><label>My position</label>
+    <div class="cfgItem sideItem"><label>My position &amp; formation</label>
       <div id="posPitch" class="posPitch"></div>
-      <div id="posPickHint" class="posHint">Tap a spot to pick your position</div>
+      <div id="posPickHint" class="posHint">Tap a spot to pick · drag bots to move them</div>
+      <label style="margin-top:9px;display:block">Opponent formation</label>
+      <div id="posPitchOpp" class="posPitch"></div>
     </div>
    </aside>
    <div id="lobMain">
@@ -523,7 +527,7 @@ var ACC = 0.30, PDAMP = 0.925, BASE_MAX = 2.55, SPRINT_MAX = 4.25;
 // herkese uygulanan global carpanlar (host ayarlar, herkese yayilir)
 var G_SPRINT = 1, G_CURVE = 1, G_SHOT = 1, G_PASS = 1;
 // karakter statlari: 5 stat, her biri 1-7, toplam 20 puan (standart 3)
-var DEF_STATS = { shot:5, curve:5, sprint:5, drib:5, power:5, energy:5 };
+var DEF_STATS = { shot:5, curve:5, sprint:5, drib:5, power:5, energy:5, ftouch:5 };
 var POS_KEYS = ['gk','def','mid','fwd'];
 var POS_TR = { gk:'Goalkeeper', def:'Defender', mid:'Midfielder', fwd:'Forward' };
 
@@ -535,7 +539,7 @@ function defaultBotStats(){
     t[d] = {};
     for(var i=0;i<POS_KEYS.length;i++){
       var pos = POS_KEYS[i];
-      var base = { shot:5, curve:5, sprint:5, drib:5, power:5, energy:5 };
+      var base = { shot:5, curve:5, sprint:5, drib:5, power:5, energy:5, ftouch:5 };
       // mevkiye gore egilim
       if(pos==='gk'){ base.power=7; base.sprint=5; base.shot=6; base.drib=3; base.curve=3; base.energy=6; }
       else if(pos==='def'){ base.power=7; base.drib=5; base.shot=5; base.sprint=5; base.curve=3; base.energy=6; }
@@ -543,7 +547,7 @@ function defaultBotStats(){
       else { base.shot=7; base.sprint=7; base.drib=5; base.curve=5; base.power=4; base.energy=5; }
       // seviyeye gore kademeli guclenme
       var bump = [-2, -1, 0, 1, 2][d];
-      ['shot','curve','sprint','drib','power','energy'].forEach(function(k){
+      ['shot','curve','sprint','drib','power','energy','ftouch'].forEach(function(k){
         base[k] = Math.max(1, Math.min(10, base[k] + bump));
       });
       t[d][pos] = base;
@@ -559,7 +563,7 @@ function botStatsFor(diff, pos){
 }
 function cleanBotStat(s){
   var o = {};
-  ['shot','curve','sprint','drib','power','energy'].forEach(function(k){
+  ['shot','curve','sprint','drib','power','energy','ftouch'].forEach(function(k){
     var v = (s && typeof s[k]==='number') ? Math.round(s[k]) : 5;
     o[k] = Math.max(1, Math.min(10, v));
   });
@@ -577,9 +581,9 @@ function cleanBotStatsTable(t){
   }
   return out;
 }
-var STAT_KEYS = ['shot','curve','sprint','drib','power','energy'];
-var STAT_LABELS = { shot:'Long ball power', curve:'Curve', sprint:'Sprint speed', drib:'Dribbling speed', power:'Strength (push/resist)', energy:'Max energy (sprint time)' };
-var STAT_MIN = 1, STAT_MAX = 10, STAT_TOTAL = 40;
+var STAT_KEYS = ['shot','curve','sprint','drib','power','energy','ftouch'];
+var STAT_LABELS = { shot:'Long ball power', curve:'Curve', sprint:'Sprint speed', drib:'Dribbling speed', power:'Strength (push/resist)', energy:'Max energy (sprint time)', ftouch:'First touch (trap control)' };
+var STAT_MIN = 1, STAT_MAX = 10, STAT_TOTAL = 45;
 function cleanStats(s){
   var o = {}, sum = 0;
   for(var i=0;i<STAT_KEYS.length;i++){
@@ -589,7 +593,7 @@ function cleanStats(s){
     o[k] = v; sum += v;
   }
   // toplam asilirsa standarda don (hile korumasi)
-  if(sum > STAT_TOTAL) return { shot:5, curve:5, sprint:5, drib:5, power:5, energy:5 };
+  if(sum > STAT_TOTAL) return { shot:5, curve:5, sprint:5, drib:5, power:5, energy:5, ftouch:5 };
   return o;
 }
 function statF(v, per){ return 1 + (v-5)*per; }   // 5 = standart
@@ -602,6 +606,8 @@ function applyStats(p, s, raw){
   p.fDrib   = statF(st.drib,   0.038);
   p.mass    = 1 + (st.power-5)*0.11;     // 1 -> 0.56 | 10 -> 1.55
   p.maxStam = STAM_MAX * statF(st.energy, 0.11);   // 1 -> %56 | 10 -> %155 sprint suresi
+  // FIRST TOUCH: bu hiza kadar gelen top sektirilmeden kontrol edilir (1->2.2, 5->~4.4, 10->~7.1 > pas hizi)
+  p.fTouchMax = 2.2 + (st.ftouch - 1)/9 * (PASS_SPD*1.05 - 2.2);
   p.stamina = p.maxStam;                            // tam enerjiyle basla
   p.lock = false;
 }
@@ -640,6 +646,42 @@ function normPos(pos){                         // eski/gecersiz -> gecerli detay
 }
 function posRole(pos){ return POS_ROLE[normPos(pos)] || 'mid'; }
 function posLabel(pos){ return (POS_BY_K[normPos(pos)]||POS_BY_K.cm).lab; }
+
+// ===== FORMASYONLAR: ayni 11 anahtar, her formasyonda konum/etiket/rol farkli =====
+var FORMATIONS = {
+  '433': { name:'4-3-3', s:{
+    gk:{lab:'GK',role:'gk',px:0.06,py:0.50}, lb:{lab:'LB',role:'def',px:0.22,py:0.82},
+    cbl:{lab:'CB',role:'def',px:0.16,py:0.60}, cbr:{lab:'CB',role:'def',px:0.16,py:0.40},
+    rb:{lab:'RB',role:'def',px:0.22,py:0.18}, cdm:{lab:'CDM',role:'mid',px:0.37,py:0.50},
+    cm:{lab:'CM',role:'mid',px:0.50,py:0.66}, cam:{lab:'CAM',role:'mid',px:0.58,py:0.34},
+    lw:{lab:'LW',role:'fwd',px:0.80,py:0.82}, st:{lab:'ST',role:'fwd',px:0.87,py:0.50}, rw:{lab:'RW',role:'fwd',px:0.80,py:0.18}
+  }},
+  '442': { name:'4-4-2', s:{
+    gk:{lab:'GK',role:'gk',px:0.06,py:0.50}, lb:{lab:'LB',role:'def',px:0.22,py:0.84},
+    cbl:{lab:'CB',role:'def',px:0.15,py:0.62}, cbr:{lab:'CB',role:'def',px:0.15,py:0.38},
+    rb:{lab:'RB',role:'def',px:0.22,py:0.16}, lw:{lab:'LM',role:'mid',px:0.50,py:0.85},
+    cdm:{lab:'CM',role:'mid',px:0.46,py:0.60}, cm:{lab:'CM',role:'mid',px:0.46,py:0.40},
+    rw:{lab:'RM',role:'mid',px:0.50,py:0.15}, cam:{lab:'ST',role:'fwd',px:0.84,py:0.60}, st:{lab:'ST',role:'fwd',px:0.84,py:0.40}
+  }},
+  '4231': { name:'4-2-3-1', s:{
+    gk:{lab:'GK',role:'gk',px:0.06,py:0.50}, lb:{lab:'LB',role:'def',px:0.22,py:0.84},
+    cbl:{lab:'CB',role:'def',px:0.15,py:0.62}, cbr:{lab:'CB',role:'def',px:0.15,py:0.38},
+    rb:{lab:'RB',role:'def',px:0.22,py:0.16}, cdm:{lab:'CDM',role:'mid',px:0.36,py:0.60},
+    cm:{lab:'CDM',role:'mid',px:0.36,py:0.40}, lw:{lab:'LW',role:'fwd',px:0.66,py:0.82},
+    cam:{lab:'CAM',role:'mid',px:0.62,py:0.50}, rw:{lab:'RW',role:'fwd',px:0.66,py:0.18}, st:{lab:'ST',role:'fwd',px:0.87,py:0.50}
+  }},
+  '352': { name:'3-5-2', s:{
+    gk:{lab:'GK',role:'gk',px:0.06,py:0.50}, cbl:{lab:'CB',role:'def',px:0.16,py:0.68},
+    rb:{lab:'CB',role:'def',px:0.14,py:0.50}, cbr:{lab:'CB',role:'def',px:0.16,py:0.32},
+    lb:{lab:'LWB',role:'mid',px:0.42,py:0.88}, cdm:{lab:'CDM',role:'mid',px:0.34,py:0.50},
+    cm:{lab:'CM',role:'mid',px:0.50,py:0.64}, cam:{lab:'CAM',role:'mid',px:0.58,py:0.36},
+    rw:{lab:'RWB',role:'mid',px:0.42,py:0.12}, lw:{lab:'ST',role:'fwd',px:0.85,py:0.60}, st:{lab:'ST',role:'fwd',px:0.85,py:0.40}
+  }}
+};
+var FORM_KEYS = ['433','442','4231','352'];
+function teamForm(team){ return (LOBBY.cfg && LOBBY.cfg['form'+team]) || '433'; }
+function fSpots(team){ var f=FORMATIONS[teamForm(team)]; return (f?f.s:FORMATIONS['433'].s); }
+function posSpot(team, k){ return fSpots(team)[k] || POS_BY_K[k] || POS_BY_K.cm; }
 var BOT_FILL_ORDER = ['gk','cbl','cbr','cdm','st','lb','rb','cm','cam','lw','rw'];
 var matchMins = 0;                                  // 0 = suresiz
 var PEN_W = 114, PEN_EXT = 45;                      // ceza sahasi: derinlik ve kale ustu/alti tasma
@@ -711,7 +753,7 @@ function updateCamera(v){
   if(H + my*2 <= halfH*2) CAM.y = H/2;
   else CAM.y = Math.max(halfH - my, Math.min(H - halfH + my, CAM.y));
 }
-var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, gPass:1, bMass:2.2, tc0:'#E56E56', tc1:'#5689E5', cap0:null, cap1:null }, started:false };
+var LOBBY = { roster:[], cfg:{ field:'big', goals:3, style0:1, style1:1, form0:'433', form1:'433', diff:2, mins:0, spdP:1, spdB:1, gSprint:1, gCurve:1, gShot:1, gPass:1, bMass:2.2, tc0:'#E56E56', tc1:'#5689E5', cap0:null, cap1:null }, started:false };
 var DIFF_NAMES = ['Beginner','Intermediate','Advanced','Expert','Master'];
 var DIFFS = [
   { spd:1.00, aimErr:0.46, shootRange:250, sprint:true, sprintDist:120, kcd:560, keepErr:30, press:0, stamMin:45, aimDot:0.10, keepOut:0.20 },
@@ -803,7 +845,7 @@ function newPlayer(id, name, team, bot, stats){
   var np = { id:id, name:name, team:team, bot:bot,
            x:0, y:0, vx:0, vy:0,
            stamina:STAM_MAX, lock:false, kcd:0, passReq:0, shootReq:0, callReq:0, cpassReq:0, cshootReq:0, pressReq:0, gkOutReq:0, flash:0, keeper:false, throughKick:false, kickN:0, kickPow:0,
-           stats:null, fShot:1, fCurve:1, fSprint:1, fDrib:1, mass:1,
+           stats:null, fShot:1, fCurve:1, fSprint:1, fDrib:1, mass:1, fTouchMax:2.2,
            in:{u:0,d:0,l:0,r:0,s:0}, ev:[] };
   applyStats(np, stats);
   return np;
@@ -851,7 +893,7 @@ function buildGameFromRoster(){
     var p = newPlayer(s.id, s.name, s.team, !!s.bot, s.bot ? null : s.stats);
     p.kit = cleanKit(s.kit);
     p.posK = normPos(s.pos);
-    p.role = POS_ROLE[p.posK];
+    p.role = posSpot(p.team, p.posK).role;
     p.keeper = (p.role==='gk');
     if(s.bot) applyStats(p, botStatsFor(BOT_DIFF, p.role), true);
     G.players.push(p);
@@ -885,7 +927,7 @@ function resetPositions(){
     var team = G.players.filter(function(p){return p.team===t;});
     var seen = {};
     team.forEach(function(p){
-      var pos = POS_BY_K[p.posK] || POS_BY_K.cm;
+      var pos = posSpot(t, p.posK);
       var px = pos.px, py = pos.py;
       var idx = (seen[p.posK]=(seen[p.posK]||0)+1) - 1;      // ayni mevkide birden fazla -> yay
       if(idx>0) py += (idx%2?1:-1) * 0.10 * Math.ceil(idx/2);
@@ -1006,8 +1048,12 @@ function resolveBallPlayers(nearWall){
       //    Olcut TOPUN oyuncuya dogru hizidir; topa dogru KOSMAK sekme yaratmaz.
       var ballToward = -(ball.vx*nx + ball.vy*ny);
       if(ballToward > 2.0){
-        var e = 0.62;
-        ball.vx -= (1+e)*rel*nx;  ball.vy -= (1+e)*rel*ny;   // top seker, OYUNCU ETKILENMEZ
+        // FIRST TOUCH: trap esigine kadar gelen top sektirilmez (ayaga yatar), ustunde kademeli seker
+        var ftMax = q.fTouchMax || 2.2;
+        var e;
+        if(ballToward <= ftMax){ e = 0.0; }   // kontrollu ilk dokunus: normal hiz silinir, top ayakta kalir
+        else { e = Math.min(0.62, 0.62 * (ballToward - ftMax) / (SHOOT_SPD - ftMax + 0.001)); }
+        ball.vx -= (1+e)*rel*nx;  ball.vy -= (1+e)*rel*ny;   // OYUNCU ETKILENMEZ
       }
 
       // 2) TOPU ITME: tipki bir oyuncuyu iter gibi. Oyuncu ne yavaslar ne geri seker;
@@ -1735,7 +1781,7 @@ function botThink(){
       } else if(koWaitForHuman){
         // santrayi insan alacak: bot KENDI yarisinda, toptan uzak bekler
         var frac0=(slot+1)/(team.length+1);
-        var posK0 = POS_BY_K[p.posK] || POS_BY_K.cm;
+        var posK0 = posSpot(t, p.posK);
         var hx0 = t===0 ? PX0 + posK0.px*(PX1-PX0) : PX1 - posK0.px*(PX1-PX0);
         if(t===0) hx0 = Math.min(hx0, W/2 - 90);      // orta cizgiyi gecme
         else      hx0 = Math.max(hx0, W/2 + 90);
@@ -1779,7 +1825,7 @@ function botThink(){
       } else {
         // === TOPSUZ HAREKET: hucumda bosluga kosu, savunmada markaj/sekil ===
         var frac=(slot+1)/(team.length+1);
-        var posH = POS_BY_K[p.posK] || POS_BY_K.cm;
+        var posH = posSpot(t, p.posK);
         var homeX = t===0 ? PX0 + posH.px*(PX1-PX0) : PX1 - posH.px*(PX1-PX0);
         var homeY = PY0 + posH.py*(PY1-PY0);
         var shift = (BOT_STYLE[t]-1) * 55;
@@ -2103,6 +2149,17 @@ function hostOnData(conn, msg){
       else if(msg.a==='style' && (msg.team===0||msg.team===1) && captainOf(msg.team)===conn.peer){
         var st=Math.min(2,Math.max(0,Math.round(msg.style)));
         LOBBY.cfg['style'+msg.team]=st; if(LOBBY.started) BOT_STYLE[msg.team]=st;
+      }
+      else if(msg.a==='form' && (msg.team===0||msg.team===1) && captainOf(msg.team)===conn.peer && FORMATIONS[msg.val] && !LOBBY.started){
+        LOBBY.cfg['form'+msg.team]=msg.val;
+      }
+      else if(msg.a==='botpos' && POS_BY_K[msg.pos] && !LOBBY.started){
+        var bs = LOBBY.roster.find(function(x){return x.id===msg.id && x.bot;});
+        if(bs && captainOf(bs.team)===conn.peer){
+          var ot = LOBBY.roster.find(function(x){return x.team===bs.team && x!==bs && normPos(x.pos)===msg.pos;});
+          if(ot) ot.pos = bs.pos;
+          bs.pos = msg.pos;
+        }
       }
       pushLobby(); renderLobby();
     }
@@ -3065,48 +3122,115 @@ function normalizeKeepers(){
 
 // ==== Mini saha uzerinde 11 mevkili tiklanabilir pozisyon secici ====
 function renderPosPitch(){
-  var host = el('posPitch'); if(!host) return;
   var ms = mySlot();
-  var myTeam = ms ? ms.team : null;
-  var myPos = ms ? normPos(ms.pos) : null;
-  var canPick = !!ms && ms.team!==2;
-  var taken = {};
-  if(myTeam===0||myTeam===1){ LOBBY.roster.forEach(function(s){ if(s.team===myTeam && s!==ms) taken[normPos(s.pos)]=1; }); }
+  var myTeam = (ms && (ms.team===0||ms.team===1)) ? ms.team : 0;
+  var oppTeam = myTeam===0 ? 1 : 0;
+  drawFormationPitch('posPitch', myTeam, true);
+  drawFormationPitch('posPitchOpp', oppTeam, false);
+  var hint = el('posPickHint'); if(hint) hint.style.display = (ms && ms.team!==2) ? '' : 'none';
+}
+
+// Bir takimin formasyonunu mini sahaya ciz. interactive=true ise kendi takimim:
+// bos/bot spota tikla -> oraya gec; kaptan isem botlari surukleyerek yerlerini degistir.
+function drawFormationPitch(hostId, team, interactive){
+  var host = el(hostId); if(!host) return;
+  var spots = fSpots(team);
+  var iamCap = interactive && iAmCaptain(team);
+  var canPick = interactive && !!mySlot() && mySlot().team!==2;
+  var teamCol = (team===0) ? (LOBBY.cfg.tc0||'#E56E56') : (LOBBY.cfg.tc1||'#5689E5');
+  function occ(k){ return LOBBY.roster.find(function(s){ return s.team===team && normPos(s.pos)===k; }); }
   var W0=210, H0=150, pad=9, innerW=W0-2*pad-16, innerH=H0-2*pad-16, ox=pad+8, oy=pad+8;
   var s = '<svg viewBox="0 0 '+W0+' '+H0+'" class="posSvg" preserveAspectRatio="xMidYMid meet">';
-  s += '<defs><linearGradient id="pfg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3f6b46"/><stop offset="1" stop-color="#4c7d52"/></linearGradient></defs>';
-  s += '<rect x="'+pad+'" y="'+pad+'" width="'+(W0-2*pad)+'" height="'+(H0-2*pad)+'" rx="8" fill="url(#pfg)" stroke="rgba(255,255,255,0.5)" stroke-width="1.4"/>';
+  s += '<defs><linearGradient id="pfg_'+hostId+'" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3f6b46"/><stop offset="1" stop-color="#4c7d52"/></linearGradient></defs>';
+  s += '<rect x="'+pad+'" y="'+pad+'" width="'+(W0-2*pad)+'" height="'+(H0-2*pad)+'" rx="8" fill="url(#pfg_'+hostId+')" stroke="rgba(255,255,255,0.5)" stroke-width="1.4"/>';
   s += '<line x1="'+(W0/2)+'" y1="'+pad+'" x2="'+(W0/2)+'" y2="'+(H0-pad)+'" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>';
   s += '<circle cx="'+(W0/2)+'" cy="'+(H0/2)+'" r="15" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>';
   s += '<rect x="'+pad+'" y="'+(H0/2-26)+'" width="24" height="52" fill="none" stroke="rgba(255,255,255,0.32)" stroke-width="1"/>';
   s += '<rect x="'+(W0-pad-24)+'" y="'+(H0/2-26)+'" width="24" height="52" fill="none" stroke="rgba(255,255,255,0.32)" stroke-width="1"/>';
-  POSN.forEach(function(o){
+  Object.keys(spots).forEach(function(k){
+    var o = spots[k];
     var cx = ox + o.px*innerW, cy = oy + o.py*innerH;
-    var sel = (o.k===myPos), isTaken = !!taken[o.k];
-    var fill = sel ? '#E5B356' : (isTaken ? 'rgba(18,23,27,0.9)' : 'rgba(18,23,27,0.55)');
-    var stroke = sel ? '#ffffff' : (isTaken ? 'rgba(229,179,86,0.75)' : 'rgba(255,255,255,0.55)');
-    s += '<g class="posDot'+(canPick?' pick':'')+'" data-k="'+o.k+'">';
-    s += '<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="10.5" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+(sel?2:1.2)+'"/>';
-    s += '<text x="'+cx.toFixed(1)+'" y="'+(cy+2.6).toFixed(1)+'" text-anchor="middle" font-size="7.4" font-weight="700" fill="'+(sel?'#1b2125':'#e6efe7')+'">'+o.lab+'</text>';
+    var who = occ(k);
+    var isMe = who && who.id===myPid;
+    var isBot = who && who.bot;
+    var fill, stroke, txt, txtCol;
+    if(isMe){ fill='#E5B356'; stroke='#ffffff'; txt=(who.kit&&who.kit.num)?(''+who.kit.num):'ME'; txtCol='#1b2125'; }
+    else if(who){ fill=teamCol; stroke='rgba(255,255,255,0.85)'; txt=(isBot?o.lab:((who.kit&&who.kit.num)?(''+who.kit.num):o.lab)); txtCol='#ffffff'; }
+    else { fill='rgba(18,23,27,0.5)'; stroke='rgba(255,255,255,0.55)'; txt=o.lab; txtCol='#e6efe7'; }
+    var cls='posDot';
+    var draggable = interactive && iamCap && isBot;
+    if(canPick && !isMe) cls += ' pick';
+    if(draggable) cls += ' bdrag';
+    s += '<g class="'+cls+'" data-k="'+k+'"'+(who?(' data-occ="'+who.id+'"'):'')+'>';
+    s += '<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="10.5" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+(isMe?2:1.2)+'"/>';
+    s += '<text x="'+cx.toFixed(1)+'" y="'+(cy+2.6).toFixed(1)+'" text-anchor="middle" font-size="7" font-weight="700" fill="'+txtCol+'" pointer-events="none">'+txt+'</text>';
     s += '</g>';
   });
   s += '</svg>';
   host.innerHTML = s;
+  var svg = host.querySelector('svg');
+
   if(canPick){
-    var dots = host.querySelectorAll('.posDot.pick');
-    for(var i=0;i<dots.length;i++){ dots[i].addEventListener('click', function(){ setMyPos(this.getAttribute('data-k')); }); }
+    var picks = host.querySelectorAll('.posDot.pick');
+    for(var i=0;i<picks.length;i++){
+      picks[i].addEventListener('click', function(){
+        if(this._dragged){ this._dragged=false; return; }   // suruklemeyi tiklama sayma
+        setMyPos(this.getAttribute('data-k'));
+      });
+    }
   }
-  var hint = el('posPickHint'); if(hint) hint.style.display = canPick ? '' : 'none';
+  if(interactive && iamCap){
+    var drags = host.querySelectorAll('.posDot.bdrag');
+    for(var d=0; d<drags.length; d++){ attachBotDrag(drags[d], svg, spots, ox, oy, innerW, innerH); }
+  }
+}
+
+// Bir bot dot'unu surukleyip birakilan en yakin spota tasi (kaptan)
+function attachBotDrag(g, svg, spots, ox, oy, innerW, innerH){
+  var botId = g.getAttribute('data-occ');
+  var circle = g.querySelector('circle');
+  var sx = parseFloat(circle.getAttribute('cx')), sy = parseFloat(circle.getAttribute('cy'));
+  var dragging=false, moved=false;
+  function toSvg(evt){
+    var m = svg.getScreenCTM(); if(!m) return {x:sx,y:sy};
+    var pt = svg.createSVGPoint(); pt.x=evt.clientX; pt.y=evt.clientY;
+    var p = pt.matrixTransform(m.inverse()); return {x:p.x, y:p.y};
+  }
+  g.style.cursor='grab';
+  g.addEventListener('pointerdown', function(evt){
+    evt.preventDefault(); dragging=true; moved=false;
+    try{ g.setPointerCapture(evt.pointerId); }catch(e){}
+    g.style.cursor='grabbing'; svg.appendChild(g);   // en uste getir
+  });
+  g.addEventListener('pointermove', function(evt){
+    if(!dragging) return;
+    var p = toSvg(evt); moved=true; g._dragged=true;
+    g.setAttribute('transform','translate('+(p.x-sx).toFixed(1)+','+(p.y-sy).toFixed(1)+')');
+  });
+  function endDrag(evt){
+    if(!dragging) return; dragging=false; g.style.cursor='grab'; g.removeAttribute('transform');
+    if(moved){
+      var p = toSvg(evt), best=null, bd=1e9;
+      Object.keys(spots).forEach(function(k){
+        var o=spots[k]; var cx=ox+o.px*innerW, cy=oy+o.py*innerH;
+        var dd=Math.hypot(cx-p.x, cy-p.y); if(dd<bd){ bd=dd; best=k; }
+      });
+      if(best && bd < 24 && best!==g.getAttribute('data-k')){ setBotPos(botId, best); }
+      else renderPosPitch();
+    }
+  }
+  g.addEventListener('pointerup', endDrag);
+  g.addEventListener('pointercancel', endDrag);
 }
 
 // ==== PES tarzi altigen stat radari ====
 function renderStatRadar(hostId){
   var host = el(hostId); if(!host) return;
   var vals = STAT_KEYS.map(function(k){ var v=myStats[k]; return (typeof v==='number'&&!isNaN(v))?v:STAT_MIN; });
-  var labs = ['LNG','CRV','SPD','DRB','STR','ENG'];
-  var cx=70, cy=72, R=50, n=6;
+  var labs = ['Shoot','Curve','Sprint','Dribbling','Strength','Stamina','First touch'];
+  var cx=100, cy=100, R=60, n=STAT_KEYS.length;
   function pt(i, r){ var a=-Math.PI/2 + i*2*Math.PI/n; return [cx+Math.cos(a)*r, cy+Math.sin(a)*r]; }
-  var s='<svg viewBox="0 0 140 148" class="statRadar" preserveAspectRatio="xMidYMid meet">';
+  var s='<svg viewBox="0 0 200 200" class="statRadar" preserveAspectRatio="xMidYMid meet">';
   for(var g=1; g<=4; g++){
     var rr=R*g/4, path='';
     for(var i=0;i<n;i++){ var p=pt(i,rr); path += (i?' L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1); }
@@ -3116,8 +3240,12 @@ function renderStatRadar(hostId){
   var poly='';
   for(var i=0;i<n;i++){ var r=R*(0.10 + 0.90*(vals[i]-STAT_MIN)/(STAT_MAX-STAT_MIN)); var p=pt(i,r); poly += (i?' L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1); }
   s += '<path d="'+poly+' Z" fill="rgba(229,179,86,0.32)" stroke="#E5B356" stroke-width="2" stroke-linejoin="round"/>';
-  for(var i=0;i<n;i++){ var r=R*(0.10 + 0.90*(vals[i]-STAT_MIN)/(STAT_MAX-STAT_MIN)); var p=pt(i,r); s += '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.1" fill="#E5B356"/>'; }
-  for(var i=0;i<n;i++){ var lp=pt(i,R+13); s += '<text x="'+lp[0].toFixed(1)+'" y="'+(lp[1]+3).toFixed(1)+'" text-anchor="middle" font-size="9" font-weight="700" fill="#9FB3BB">'+labs[i]+'</text>'; }
+  for(var i=0;i<n;i++){ var r=R*(0.10 + 0.90*(vals[i]-STAT_MIN)/(STAT_MAX-STAT_MIN)); var p=pt(i,r); s += '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.4" fill="#E5B356"/>'; }
+  for(var i=0;i<n;i++){
+    var lp=pt(i,R+16);
+    var anch = (lp[0] < cx-6) ? 'end' : (lp[0] > cx+6 ? 'start' : 'middle');
+    s += '<text x="'+lp[0].toFixed(1)+'" y="'+(lp[1]+3).toFixed(1)+'" text-anchor="'+anch+'" font-size="9.5" font-weight="700" fill="#B7C6CD">'+labs[i]+'</text>';
+  }
   s += '</svg>';
   host.innerHTML = s;
 }
@@ -3275,6 +3403,22 @@ function renderLobby(){
     sel.onchange = function(){ setTeamStyle(team, parseInt(this.value,10)); };
     wrap.appendChild(lab); wrap.appendChild(sel);
     col.appendChild(wrap);
+    // Formasyon secici (kaptan)
+    var fwrap = document.createElement('div');
+    fwrap.style.cssText = 'margin-top:8px;display:flex;flex-direction:column;gap:3px';
+    var flab = document.createElement('label');
+    flab.style.cssText='font-size:11px;color:#9FB3BB';
+    flab.textContent = 'Formation' + (cap?' (captain)':'');
+    var fsel = document.createElement('select');
+    fsel.style.cssText='padding:5px 8px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:12px';
+    FORM_KEYS.forEach(function(fk){
+      var o=document.createElement('option'); o.value=fk; o.textContent=FORMATIONS[fk].name; fsel.appendChild(o);
+    });
+    fsel.value = teamForm(team);
+    fsel.disabled = !cap || LOBBY.started;
+    fsel.onchange = function(){ setTeamForm(team, this.value); };
+    fwrap.appendChild(flab); fwrap.appendChild(fsel);
+    col.appendChild(fwrap);
   });
   // oyun sirasinda: oyuna don + maci bitir; ayarlar mac basladiysa kilitli
   var od = el('backToGameBtn');
@@ -3322,10 +3466,14 @@ function setMyPos(pos){
   var s = mySlot();
   if(role==='host'){
     if(s){
+      var oldPos = s.pos;
       if(posRole(pos)==='gk'){
         // ben kaleci oluyorum: takimdaki diger tum kalecileri (bot/insan) orta sahaya al
         LOBBY.roster.forEach(function(x){ if(x.team===s.team && x!==s && posRole(x.pos)==='gk') x.pos='cm'; });
       }
+      // hedef spot bir BOT tarafindan doluysa, o botu benim eski yerime al (yer degistir)
+      var occ = LOBBY.roster.find(function(x){ return x.team===s.team && x!==s && x.bot && normPos(x.pos)===normPos(pos); });
+      if(occ) occ.pos = oldPos;
       s.pos=pos;
     }
     rosterChanged(); pushLobby(); renderLobby();
@@ -3363,6 +3511,28 @@ function setTeamStyle(team, val){
     if(iAmCaptain(team)){ LOBBY.cfg['style'+team]=val; if(LOBBY.started) BOT_STYLE[team]=val; pushLobby(); renderLobby(); }
   } else if(hostConn && hostConn.open){
     hostConn.send({t:'lreq', a:'style', team:team, style:val});
+  }
+}
+function setTeamForm(team, val){
+  if(!FORMATIONS[val] || LOBBY.started) return;
+  if(role==='host'){
+    if(iAmCaptain(team)){ LOBBY.cfg['form'+team]=val; pushLobby(); renderLobby(); }
+  } else if(hostConn && hostConn.open){
+    hostConn.send({t:'lreq', a:'form', team:team, val:val});
+  }
+}
+// mini-sahada bir botu baska mevkiye tasi (kaptan). Hedef doluysa yer degistir.
+function setBotPos(botId, k){
+  if(!POS_BY_K[k] || LOBBY.started) return;
+  if(role==='host'){
+    var s = LOBBY.roster.find(function(x){return x.id===botId && x.bot;});
+    if(!s || !iAmCaptain(s.team)) return;
+    var other = LOBBY.roster.find(function(x){return x.team===s.team && x!==s && normPos(x.pos)===k;});
+    if(other) other.pos = s.pos;   // yer degistir
+    s.pos = k;
+    rosterChanged(); pushLobby(); renderLobby();
+  } else if(hostConn && hostConn.open){
+    hostConn.send({t:'lreq', a:'botpos', id:botId, pos:k});
   }
 }
 
@@ -3717,7 +3887,7 @@ function readMenu(){
 function initLobbyHost(){
   LOBBY.roster = [{ id:'host', name:myName, team:0, pos:'mid', bot:false, stats:cleanStats(myStats), kit:cleanKit(myKit) }];
   var gc0 = loadGameCfg();   // daha once kaydettigim ayarlar her yeni odada gecerli
-  LOBBY.cfg = { field:'big', goals:3, style0:1, style1:1, mins:0, cap0:null, cap1:null,
+  LOBBY.cfg = { field:'big', goals:3, style0:1, style1:1, form0:'433', form1:'433', mins:0, cap0:null, cap1:null,
                 spdP:gc0.spdP, spdB:gc0.spdB, gSprint:gc0.gSprint, gCurve:gc0.gCurve,
                 gShot:gc0.gShot, gPass:gc0.gPass, bMass:gc0.bMass, diff:gc0.diff,
                 tc0:gc0.tc0, tc1:gc0.tc1 };
