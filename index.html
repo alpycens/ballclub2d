@@ -270,7 +270,7 @@
   .posDot { transition:transform .12s ease; transform-origin:center; transform-box:fill-box; }
   .posDot.pick:hover circle { stroke:#CDE6B4; }
   .posDot.pick:hover { transform:scale(1.15); }
-  .posDot.bdrag { cursor:grab; touch-action:none; }
+  .posDot.bdrag { cursor:grab; touch-action:none; transition:none; }
   .posDot.bdrag:hover circle { stroke:#E5B356; }
   .posHint { font-size:10.5px; color:#8FA0A8; margin-top:5px; text-align:center; }
 
@@ -676,9 +676,41 @@ var FORMATIONS = {
     lb:{lab:'LWB',role:'mid',px:0.42,py:0.88}, cdm:{lab:'CDM',role:'mid',px:0.34,py:0.50},
     cm:{lab:'CM',role:'mid',px:0.50,py:0.64}, cam:{lab:'CAM',role:'mid',px:0.58,py:0.36},
     rw:{lab:'RWB',role:'mid',px:0.42,py:0.12}, lw:{lab:'ST',role:'fwd',px:0.85,py:0.60}, st:{lab:'ST',role:'fwd',px:0.85,py:0.40}
+  }},
+  '451': { name:'4-5-1', s:{
+    gk:{lab:'GK',role:'gk',px:0.06,py:0.50}, lb:{lab:'LB',role:'def',px:0.22,py:0.84},
+    cbl:{lab:'CB',role:'def',px:0.15,py:0.62}, cbr:{lab:'CB',role:'def',px:0.15,py:0.38},
+    rb:{lab:'RB',role:'def',px:0.22,py:0.16}, lw:{lab:'LM',role:'mid',px:0.52,py:0.86},
+    cdm:{lab:'CDM',role:'mid',px:0.36,py:0.50}, cm:{lab:'CM',role:'mid',px:0.50,py:0.64},
+    cam:{lab:'CM',role:'mid',px:0.50,py:0.36}, rw:{lab:'RM',role:'mid',px:0.52,py:0.14},
+    st:{lab:'ST',role:'fwd',px:0.86,py:0.50}
+  }},
+  '532': { name:'5-3-2', s:{
+    gk:{lab:'GK',role:'gk',px:0.06,py:0.50}, lb:{lab:'LWB',role:'def',px:0.30,py:0.88},
+    cbl:{lab:'CB',role:'def',px:0.16,py:0.68}, rb:{lab:'CB',role:'def',px:0.13,py:0.50},
+    cbr:{lab:'CB',role:'def',px:0.16,py:0.32}, rw:{lab:'RWB',role:'def',px:0.30,py:0.12},
+    cdm:{lab:'CDM',role:'mid',px:0.44,py:0.50}, cm:{lab:'CM',role:'mid',px:0.56,py:0.64},
+    cam:{lab:'CAM',role:'mid',px:0.58,py:0.36}, lw:{lab:'ST',role:'fwd',px:0.85,py:0.60},
+    st:{lab:'ST',role:'fwd',px:0.85,py:0.40}
+  }},
+  '343': { name:'3-4-3', s:{
+    gk:{lab:'GK',role:'gk',px:0.06,py:0.50}, cbl:{lab:'CB',role:'def',px:0.16,py:0.68},
+    rb:{lab:'CB',role:'def',px:0.13,py:0.50}, cbr:{lab:'CB',role:'def',px:0.16,py:0.32},
+    lb:{lab:'LM',role:'mid',px:0.46,py:0.86}, cdm:{lab:'CM',role:'mid',px:0.42,py:0.60},
+    cm:{lab:'CM',role:'mid',px:0.42,py:0.40}, rw:{lab:'RM',role:'mid',px:0.46,py:0.14},
+    lw:{lab:'LW',role:'fwd',px:0.80,py:0.80}, cam:{lab:'ST',role:'fwd',px:0.87,py:0.50},
+    st:{lab:'RW',role:'fwd',px:0.80,py:0.20}
+  }},
+  '4d2': { name:'4-1-2-1-2', s:{
+    gk:{lab:'GK',role:'gk',px:0.06,py:0.50}, lb:{lab:'LB',role:'def',px:0.22,py:0.84},
+    cbl:{lab:'CB',role:'def',px:0.15,py:0.62}, cbr:{lab:'CB',role:'def',px:0.15,py:0.38},
+    rb:{lab:'RB',role:'def',px:0.22,py:0.16}, cdm:{lab:'CDM',role:'mid',px:0.32,py:0.50},
+    lw:{lab:'LM',role:'mid',px:0.48,py:0.74}, rw:{lab:'RM',role:'mid',px:0.48,py:0.26},
+    cam:{lab:'CAM',role:'mid',px:0.62,py:0.50}, cm:{lab:'ST',role:'fwd',px:0.85,py:0.60},
+    st:{lab:'ST',role:'fwd',px:0.85,py:0.40}
   }}
 };
-var FORM_KEYS = ['433','442','4231','352'];
+var FORM_KEYS = ['433','442','4231','451','352','532','343','4d2'];
 function teamForm(team){ return (LOBBY.cfg && LOBBY.cfg['form'+team]) || '433'; }
 function fSpots(team){ var f=FORMATIONS[teamForm(team)]; return (f?f.s:FORMATIONS['433'].s); }
 function posSpot(team, k){ return fSpots(team)[k] || POS_BY_K[k] || POS_BY_K.cm; }
@@ -3159,7 +3191,7 @@ function drawFormationPitch(hostId, team, interactive){
     else { fill='rgba(18,23,27,0.5)'; stroke='rgba(255,255,255,0.55)'; txt=o.lab; txtCol='#e6efe7'; }
     var cls='posDot';
     var draggable = interactive && iamCap && isBot;
-    if(canPick && !isMe) cls += ' pick';
+    if(canPick && !isMe && !draggable) cls += ' pick';   // suruklenebilir bota hover-scale ekleme (drag ile cakisir)
     if(draggable) cls += ' bdrag';
     s += '<g class="'+cls+'" data-k="'+k+'"'+(who?(' data-occ="'+who.id+'"'):'')+'>';
     s += '<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="10.5" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+(isMe?2:1.2)+'"/>';
@@ -3185,12 +3217,13 @@ function drawFormationPitch(hostId, team, interactive){
   }
 }
 
-// Bir bot dot'unu surukleyip birakilan en yakin spota tasi (kaptan)
+// Bir bot dot'unu surukleyip birakilan en yakin spota tasi (kaptan). Suruklenmezse spotu ben alirim.
 function attachBotDrag(g, svg, spots, ox, oy, innerW, innerH){
   var botId = g.getAttribute('data-occ');
+  var myK = g.getAttribute('data-k');
   var circle = g.querySelector('circle');
   var sx = parseFloat(circle.getAttribute('cx')), sy = parseFloat(circle.getAttribute('cy'));
-  var dragging=false, moved=false;
+  var dragging=false, moved=false, downX=0, downY=0;
   function toSvg(evt){
     var m = svg.getScreenCTM(); if(!m) return {x:sx,y:sy};
     var pt = svg.createSVGPoint(); pt.x=evt.clientX; pt.y=evt.clientY;
@@ -3198,13 +3231,15 @@ function attachBotDrag(g, svg, spots, ox, oy, innerW, innerH){
   }
   g.style.cursor='grab';
   g.addEventListener('pointerdown', function(evt){
-    evt.preventDefault(); dragging=true; moved=false;
-    try{ g.setPointerCapture(evt.pointerId); }catch(e){}
-    g.style.cursor='grabbing'; svg.appendChild(g);   // en uste getir
+    evt.preventDefault(); dragging=true; moved=false; downX=evt.clientX; downY=evt.clientY;
+    svg.appendChild(g);                                  // once en uste getir
+    try{ g.setPointerCapture(evt.pointerId); }catch(e){} // sonra yakala (yeniden konumdan sonra)
+    g.style.cursor='grabbing';
   });
   g.addEventListener('pointermove', function(evt){
     if(!dragging) return;
-    var p = toSvg(evt); moved=true; g._dragged=true;
+    if(Math.abs(evt.clientX-downX) + Math.abs(evt.clientY-downY) > 3) moved=true;   // esik: minik titremeyi drag sayma
+    var p = toSvg(evt);
     g.setAttribute('transform','translate('+(p.x-sx).toFixed(1)+','+(p.y-sy).toFixed(1)+')');
   });
   function endDrag(evt){
@@ -3215,8 +3250,10 @@ function attachBotDrag(g, svg, spots, ox, oy, innerW, innerH){
         var o=spots[k]; var cx=ox+o.px*innerW, cy=oy+o.py*innerH;
         var dd=Math.hypot(cx-p.x, cy-p.y); if(dd<bd){ bd=dd; best=k; }
       });
-      if(best && bd < 24 && best!==g.getAttribute('data-k')){ setBotPos(botId, best); }
-      else renderPosPitch();
+      if(best && bd < 26 && best!==myK){ setBotPos(botId, best); }
+      else renderPosPitch();                             // gecersiz birakma -> yerine geri ciz
+    } else {
+      setMyPos(myK);                                     // suruklenmedi = dokunma -> bu spotu ben al
     }
   }
   g.addEventListener('pointerup', endDrag);
