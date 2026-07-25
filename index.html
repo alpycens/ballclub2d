@@ -878,25 +878,41 @@ function resetPositions(){
 /* ================= FİZİK (HOST) ================= */
 // Baslama vurusunda: vurusu yapmayan takim kendi yarisinda ve orta cemberin disinda kalir.
 function enforceKickoffZones(){
-  var cx = W/2, cy = H/2, lim = CIRCLE_R + PR;
+  var cx = W/2, cy = H/2;
   for(var i=0;i<G.players.length;i++){
     var p = G.players[i];
-    if(p.team === G.koTeam) continue;
-    // 1) orta yuvarlak: RADYAL olarak disari it. Sadece ice dogru hiz silinir,
-    //    TEGETSEL kayma serbest -> oyuncu yay boyunca kayar, sertce geri atilmaz.
-    var dx = p.x-cx, dy = p.y-cy, d2 = dx*dx + dy*dy;
-    if(d2 < lim*lim){
-      var d = Math.sqrt(d2), nx, ny;
-      if(d > 0.001){ nx = dx/d; ny = dy/d; }
-      else { nx = (p.team===0 ? -1 : 1); ny = 0; }   // tam merkezde: kendi yarina dogru it
-      p.x = cx + nx*lim;
-      p.y = cy + ny*lim;
-      var vr = p.vx*nx + p.vy*ny;                    // radyal (disari +) hiz
-      if(vr < 0){ p.vx -= vr*nx; p.vy -= vr*ny; }    // yalnizca ice dogru bileseni sil
+    var dx = p.x-cx, dy = p.y-cy, cd = Math.sqrt(dx*dx+dy*dy);
+    if(p.team === G.koTeam){
+      // BASLAMA VURUSUNU YAPAN: kendi yarisi + TUM yuvarlak serbest.
+      // Rakip yarida yalnizca yuvarlak icinde olabilir; disari cikinca sertce degil,
+      // en yakin sinira (yay ya da orta cizgi) YUMUSAKCA kayar.
+      var past = (p.team===0) ? (p.x > cx) : (p.x < cx);
+      if(past && cd > CIRCLE_R){
+        var distLine = Math.abs(p.x - cx), distArc = cd - CIRCLE_R;
+        if(distArc < distLine && cd > 0.001){
+          var nx = dx/cd, ny = dy/cd;                 // yuvarlagin yayina getir, tegetsel kayma serbest
+          p.x = cx + nx*CIRCLE_R; p.y = cy + ny*CIRCLE_R;
+          var vn = p.vx*nx + p.vy*ny;
+          if(vn > 0){ p.vx -= vn*nx; p.vy -= vn*ny; } // yaydan disari hizi sil
+        } else {
+          p.x = cx;                                    // orta cizgide dikey duvar kaymasi
+          if(p.team===0){ if(p.vx>0) p.vx=0; } else { if(p.vx<0) p.vx=0; }
+        }
+      }
+    } else {
+      // MACA BASLAMAYAN (rakip): kendi yarisi + yuvarlagin DISI. Yay boyunca kayar.
+      var lim = CIRCLE_R + PR;
+      if(cd < lim){
+        var rnx, rny;
+        if(cd > 0.001){ rnx = dx/cd; rny = dy/cd; }
+        else { rnx = (p.team===0 ? -1 : 1); rny = 0; }
+        p.x = cx + rnx*lim; p.y = cy + rny*lim;
+        var vr = p.vx*rnx + p.vy*rny;
+        if(vr < 0){ p.vx -= vr*rnx; p.vy -= vr*rny; }  // yalnizca ice dogru hizi sil
+      }
+      if(p.team===0){ var l0 = cx-(PR+4); if(p.x > l0){ p.x = l0; if(p.vx>0) p.vx = 0; } }
+      else { var l1 = cx+(PR+4); if(p.x < l1){ p.x = l1; if(p.vx<0) p.vx = 0; } }
     }
-    // 2) orta cizgi: kendi yarisinda kal (yuvarlak disindaki bolgede cizgiye kadar kayar)
-    if(p.team===0){ var l0 = cx-(PR+4); if(p.x > l0){ p.x = l0; if(p.vx>0) p.vx = 0; } }
-    else { var l1 = cx+(PR+4); if(p.x < l1){ p.x = l1; if(p.vx<0) p.vx = 0; } }
     // saha disina cikma
     p.y = Math.max(PY0+PR, Math.min(PY1-PR, p.y));
   }
@@ -1141,33 +1157,8 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
       }
     }
 
-    // baslama vurusu: top oyuna girene dek herkes kendi yarisinda,
-    // rakip takim orta yuvarlaga da giremez
-    if(G.ko && play){
-      var isKo = (p.team===G.koTeam);
-      var cdx=p.x-W/2, cdy=p.y-H/2, cd=Math.sqrt(cdx*cdx+cdy*cdy);
-      if(isKo){
-        // baslama vurusunu yapan: kendi yarisi + orta yuvarlagin TAMAMI serbest
-        var past = (p.team===0) ? (p.x > W/2) : (p.x < W/2);
-        if(past && cd > CIRCLE_R){
-          if(p.team===0){ if(p.x > W/2){ p.x = W/2; p.vx = 0; } }
-          else { if(p.x < W/2){ p.x = W/2; p.vx = 0; } }
-        }
-      } else {
-        // rakip: kendi yarisinda ve yuvarlagin disinda kalir
-        if(p.team===0){ var lim0 = W/2 - (PR+4); if(p.x > lim0){ p.x = lim0; p.vx = 0; } }
-        else { var lim1 = W/2 + (PR+4); if(p.x < lim1){ p.x = lim1; p.vx = 0; } }
-        var climC = CIRCLE_R+PR;
-        if(cd < climC && cd>0){
-          var cnx = cdx/cd, cny = cdy/cd;
-          p.x = W/2 + cnx*climC;
-          p.y = H/2 + cny*climC;
-          // duz orta cizgideki gibi: sadece ice dogru hizi sil, tegetsel kaymaya izin ver
-          var vnC = p.vx*cnx + p.vy*cny;
-          if(vnC < 0){ p.vx -= vnC*cnx; p.vy -= vnC*cny; }
-        }
-      }
-    }
+    // baslama vurusu bolge kisiti tek yerde (enforceKickoffZones) yumusak sekilde uygulanir
+
 
     // olaylar (pas / şut)
   }
