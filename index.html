@@ -154,17 +154,21 @@
     background:rgba(37,46,51,0.82); border:none; border-radius:0; backdrop-filter:blur(2px); }
   body.fsmode #botBar { position:absolute; bottom:0; left:0; z-index:5;
     background:rgba(37,46,51,0.82); border:none; border-radius:0; backdrop-filter:blur(2px); }
-  body.fsmode #chatWrap { position:absolute; left:10px; bottom:58px; z-index:4;
-    background:rgba(37,46,51,0.12); border-color:rgba(60,74,82,0.4); }
+  body.fsmode #chatWrap { position:absolute; left:10px; bottom:54px; z-index:4;
+    background:rgba(37,46,51,0.12); border-color:rgba(60,74,82,0.4);
+    padding:6px 8px; border-radius:7px; }
   body.fsmode #chatWrap:hover, body.fsmode #chatWrap:focus-within {
     background:rgba(37,46,51,0.78); border-color:rgba(96,116,128,0.8); }
-  body.fsmode #chatLog { height:70px; }
+  body.fsmode #chatLog { height:40px; font-size:12px; line-height:1.35; margin-bottom:4px; }
+  body.fsmode #chatRow { gap:6px; }
+  body.fsmode #chatInp { padding:5px 8px; font-size:12px; }
+  body.fsmode #chatSend { padding:5px 12px; font-size:12px; }
   body.fsmode #cv { display:block; }
   html:fullscreen, html:-webkit-full-screen { background:#1B2125; }
   html:fullscreen body, html:-webkit-full-screen body { min-height:100vh; justify-content:center; background:#1B2125; }
 
   /* LOBI */
-  #lobby { display:none; margin-top:18px; margin-bottom:18px; width:1020px; }
+  #lobby { display:none; margin-top:18px; margin-bottom:18px; width:1020px; zoom:1.25; }
   #lobby h1 { font-size:24px; letter-spacing:1px; color:#CDE6B4; }
   #lobHead { display:flex; align-items:center; justify-content:space-between;
              background:#252E33; border:1px solid #3C4A52; border-radius:8px 8px 0 0;
@@ -596,6 +600,17 @@ var CAM_ZOOM_MIN = 0.40, CAM_ZOOM_MAX = 6.0;
 // Boylece hem saha boyutu hem ekran boyutu degisse de kademeler tutarli kalir.
 var CAM_PRESET_MUL = [null, 1.0, 1.32, 1.72, 2.25];
 var camToast = { ms:0, txt:'' };
+var koAnim = 0;   // baslama vurusu bildirimi yumusak gecis degeri
+function roundRectPath(c, x, y, w, h, r){
+  r = Math.min(r, w/2, h/2);
+  c.beginPath();
+  c.moveTo(x+r, y);
+  c.arcTo(x+w, y,   x+w, y+h, r);
+  c.arcTo(x+w, y+h, x,   y+h, r);
+  c.arcTo(x,   y+h, x,   y,   r);
+  c.arcTo(x,   y,   x+w, y,   r);
+  c.closePath();
+}
 
 // tum sahanin sigacagi zoom
 function fitZoom(){
@@ -863,24 +878,27 @@ function resetPositions(){
 /* ================= FİZİK (HOST) ================= */
 // Baslama vurusunda: vurusu yapmayan takim kendi yarisinda ve orta cemberin disinda kalir.
 function enforceKickoffZones(){
+  var cx = W/2, cy = H/2, lim = CIRCLE_R + PR;
   for(var i=0;i<G.players.length;i++){
     var p = G.players[i];
     if(p.team === G.koTeam) continue;
-    // 1) orta cizgi: duz duvar gibi, sadece ileri hizi sifirlanir (tegetsel kayma serbest)
-    if(p.team===0){ var l0 = W/2-(PR+4); if(p.x > l0){ p.x = l0; if(p.vx>0) p.vx = 0; } }
-    else { var l1 = W/2+(PR+4); if(p.x < l1){ p.x = l1; if(p.vx<0) p.vx = 0; } }
-    // 2) orta yuvarlak: DIKEY kacis kullan. Radyal itme oyuncuyu orta cizgiye geri
-    //    savuruyordu (iki kisit birbiriyle cakisip "geri atma" hissi veriyordu).
-    var dx = p.x-W/2, dy = p.y-H/2;
-    var lim = CIRCLE_R + PR;
-    if(dx*dx + dy*dy < lim*lim){
-      var need = Math.sqrt(Math.max(0, lim*lim - dx*dx));   // bu x'te cemberden cikis mesafesi
-      var sgn = (dy >= 0) ? 1 : -1;
-      p.y = H/2 + sgn*need;
-      if(sgn > 0 && p.vy < 0) p.vy = 0;                     // cembere dogru olan dikey hiz sifir
-      if(sgn < 0 && p.vy > 0) p.vy = 0;
-      p.y = Math.max(PY0+PR, Math.min(PY1-PR, p.y));
+    // 1) orta yuvarlak: RADYAL olarak disari it. Sadece ice dogru hiz silinir,
+    //    TEGETSEL kayma serbest -> oyuncu yay boyunca kayar, sertce geri atilmaz.
+    var dx = p.x-cx, dy = p.y-cy, d2 = dx*dx + dy*dy;
+    if(d2 < lim*lim){
+      var d = Math.sqrt(d2), nx, ny;
+      if(d > 0.001){ nx = dx/d; ny = dy/d; }
+      else { nx = (p.team===0 ? -1 : 1); ny = 0; }   // tam merkezde: kendi yarina dogru it
+      p.x = cx + nx*lim;
+      p.y = cy + ny*lim;
+      var vr = p.vx*nx + p.vy*ny;                    // radyal (disari +) hiz
+      if(vr < 0){ p.vx -= vr*nx; p.vy -= vr*ny; }    // yalnizca ice dogru bileseni sil
     }
+    // 2) orta cizgi: kendi yarisinda kal (yuvarlak disindaki bolgede cizgiye kadar kayar)
+    if(p.team===0){ var l0 = cx-(PR+4); if(p.x > l0){ p.x = l0; if(p.vx>0) p.vx = 0; } }
+    else { var l1 = cx+(PR+4); if(p.x < l1){ p.x = l1; if(p.vx<0) p.vx = 0; } }
+    // saha disina cikma
+    p.y = Math.max(PY0+PR, Math.min(PY1-PR, p.y));
   }
 }
 
@@ -2355,14 +2373,8 @@ function render(v){
       ctx.fillRect(bx0, by0, bw*(stv/100), bh);
     }
   }
-  // baslama vurusu bildirimi
-  if(v.ko && !v.pa && !v.m){
-    ctx.fillStyle='rgba(27,33,37,0.55)';
-    ctx.font='bold 15px Segoe UI, Arial'; ctx.textAlign='center';
-    var kn = teamNameOf(v, v.kt);
-    ctx.fillStyle = readableCol((v.tc && v.tc[v.kt]) ? v.tc[v.kt] : TEAM_COL[v.kt]);
-    ctx.fillText('Kick-off: ' + kn, W/2, PY0 - 12);
-  }
+  // baslama vurusu bildirimi ekran katmaninda (HUD) pill olarak cizilir - asagida
+
   ctx.restore();   // ---- EKRAN KATMANI (HUD) ----
 
   // duraklatma / geri sayim
@@ -2410,6 +2422,36 @@ function render(v){
     ctx.fillRect(0, VIEW_H/2-42, VIEW_W, 84);
     ctx.fillStyle='#FFFFFF'; ctx.font='bold 34px Segoe UI, Arial'; ctx.textAlign='center';
     ctx.fillText(v.m, VIEW_W/2, VIEW_H/2+12);
+  }
+  // baslama vurusu bildirimi - sik pill (yumusak beliren/kaybolan)
+  koAnim += (((v.ko && !v.pa && !v.m) ? 1 : 0) - koAnim) * 0.14;
+  if(koAnim > 0.012){
+    var _a = Math.min(1, koAnim);
+    var _kn = teamNameOf(v, v.kt).toUpperCase();
+    var _kc = (v.tc && v.tc[v.kt]) ? v.tc[v.kt] : TEAM_COL[v.kt];
+    ctx.save();
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    var _f1 = '600 12px Segoe UI, Arial', _f2 = '800 15px Segoe UI, Arial';
+    ctx.font = _f1; var _w1 = ctx.measureText('KICK-OFF').width;
+    ctx.font = _f2; var _w2 = ctx.measureText(_kn).width;
+    var _padX = 15, _dot = 9, _gap = 9, _sep = 11;
+    var _pw = _padX*2 + _dot + _gap + _w1 + _sep + _w2, _ph = 34;
+    var _px = Math.round((VIEW_W - _pw)/2);
+    var _py = Math.round(50 - (1-_a)*10);          // hafif yukaridan kayarak gelir
+    ctx.globalAlpha = _a;
+    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 3;
+    roundRectPath(ctx, _px, _py, _pw, _ph, _ph/2);
+    ctx.fillStyle = 'rgba(22,28,32,0.86)'; ctx.fill();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.stroke();
+    var _cy = _py + _ph/2, _cx = _px + _padX + _dot/2;
+    ctx.beginPath(); ctx.arc(_cx, _cy, _dot/2, 0, Math.PI*2); ctx.fillStyle = _kc; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.stroke();
+    var _tx = _px + _padX + _dot + _gap;
+    ctx.font = _f1; ctx.fillStyle = 'rgba(196,210,216,0.78)'; ctx.fillText('KICK-OFF', _tx, _cy + 1);
+    _tx += _w1 + _sep;
+    ctx.font = _f2; ctx.fillStyle = '#FFFFFF'; ctx.fillText(_kn, _tx, _cy + 1);
+    ctx.restore();
   }
   // HUD
   // kamera kademesi bildirimi
@@ -3231,7 +3273,7 @@ function fitScale(){
     VIEW_H = Math.max(360, Math.round(window.innerHeight));
     el('topBar').style.width = VIEW_W + 'px';
     el('botBar').style.width = VIEW_W + 'px';
-    el('chatWrap').style.width = Math.min(430, Math.round(VIEW_W*0.34)) + 'px';
+    el('chatWrap').style.width = Math.min(290, Math.round(VIEW_W*0.22)) + 'px';
     if(CAM.preset >= 1 && CAM.preset <= 4) CAM.zoom = presetZoom(CAM.preset);
     applyCanvasRes(1);
     return;
