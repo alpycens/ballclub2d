@@ -934,9 +934,17 @@ function enforceKickoffZones(){
     var p = G.players[i];
     var dx = p.x-cx, dy = p.y-cy, cd = Math.sqrt(dx*dx+dy*dy);
     if(p.team === G.koTeam){
-      // BASLAMA VURUSUNU YAPAN: kendi yarisi + TUM yuvarlak serbest.
-      // Rakip yarida yalnizca yuvarlak icinde olabilir; disari cikinca sertce degil,
-      // en yakin sinira (yay ya da orta cizgi) YUMUSAKCA kayar.
+      if(!p.bot){
+        // BASLAMA VURUSUNU YAPAN INSAN: yuvarlagin ICINDE kal (disari cikamaz), yay boyunca kayar
+        if(cd > CIRCLE_R && cd > 0.001){
+          var inx = dx/cd, iny = dy/cd;
+          p.x = cx + inx*CIRCLE_R; p.y = cy + iny*CIRCLE_R;   // ic kenara getir
+          var vin = p.vx*inx + p.vy*iny;                       // disari (radyal +) hiz
+          if(vin > 0){ p.vx -= vin*inx; p.vy -= vin*iny; }     // disari hizi sil, tegetsel kalsin
+        }
+      } else {
+      // BOT (baslama vurusu takimi): kendi yarisi + TUM yuvarlak serbest.
+      // Rakip yarida yalnizca yuvarlak icinde olabilir; disari cikinca yumusakca kayar.
       var past = (p.team===0) ? (p.x > cx) : (p.x < cx);
       if(past && cd > CIRCLE_R){
         var distLine = Math.abs(p.x - cx), distArc = cd - CIRCLE_R;
@@ -949,6 +957,7 @@ function enforceKickoffZones(){
           p.x = cx;                                    // orta cizgide dikey duvar kaymasi
           if(p.team===0){ if(p.vx>0) p.vx=0; } else { if(p.vx<0) p.vx=0; }
         }
+      }
       }
     } else {
       // MACA BASLAMAYAN (rakip): kendi yarisi + yuvarlagin DISI. Yay boyunca kayar.
@@ -1539,7 +1548,7 @@ function botThink(){
       for(var si=0; si<team.length; si++){ var q5=team[si];
         if(!q5.bot || q5===chaser || q5===keeper) continue;
         var d5=dist(q5,ball); if(d5<sb2){ sb2=d5; support2=q5; } }
-      if(support2 && dist(support2,ball) > 220 + DIFFS[BOT_DIFF].press*60) support2=null;
+      if(support2 && dist(support2,ball) > 260 + DIFFS[BOT_DIFF].press*90) support2=null;
     }
     var markMap = {};
     if(!weHave){
@@ -1700,7 +1709,15 @@ function botThink(){
           shotTaken = botKick(p, gx2, aimY2, SHOOT_SPD, md);
         }
         if(!shotTaken){
-          var sprint = Dc.sprint && dist(p,ball) > 34 && p.stamina > 4 && !p.lock;   // topa yetismek icin surekli sprint
+          // SPRINT ZAMANLAMASI: top serbest/cekismeli (rakip yarisiyor) ya da uzaksa kos.
+          // sahipsiz-yakin durumda YURU (stamina biriktir ki cekismede sprint atabilsin).
+          var oppNearBall = 1e9;
+          for(var onb=0; onb<G.players.length; onb++){ var q7=G.players[onb];
+            if(q7.team===t) continue; var dq=dist(q7,ball); if(dq<oppNearBall) oppNearBall=dq; }
+          var myBallD = dist(p,ball);
+          var contested = (possT !== t) || (oppNearBall < myBallD + 70);   // rakip topa yakin/yarisiyor
+          var sprint = Dc.sprint && !p.lock && p.stamina > 3 && myBallD > 26 &&
+                       (contested || myBallD > 95);
           // topa dogru taraftan yaklas: arkasina gec ki temas topu ILERI itsin
           var cxv = ball.x-p.x, cyv = ball.y-p.y, cl2 = Math.sqrt(cxv*cxv+cyv*cyv)||1;
           var gxv = aimTX-ball.x, gyv = aimTY-ball.y, gl2 = Math.sqrt(gxv*gxv+gyv*gyv)||1;
@@ -1786,11 +1803,14 @@ function botThink(){
           // tek ikinci baskici (ucuncu bot gelmez -> uşuşme yok)
           tx = ball.x; ty = ball.y;
         } else if(!weHave && markMap[p.id]){
-          // MARKAJ: rakip ile kendi kalemiz arasinda, ona yakin dur
+          // MARKAJ: pas hattini kes -> rakip ile TOP arasinda dur, hafif kale tarafinda
           var om = markMap[p.id];
-          var mgx = ownGX - om.x, mgy = ownGY - om.y, mgl = Math.hypot(mgx,mgy)||1;
-          tx = om.x + (mgx/mgl)*42;
-          ty = om.y + (mgy/mgl)*24;
+          var tbx = ball.x-om.x, tby = ball.y-om.y, tbl = Math.hypot(tbx,tby)||1;
+          var tgx = ownGX-om.x, tgy = ownGY-om.y, tgl = Math.hypot(tgx,tgy)||1;
+          var bxu=tbx/tbl, byu=tby/tbl, gxu=tgx/tgl, gyu=tgy/tgl;
+          var mxu = bxu*0.58 + gxu*0.42, myu = byu*0.58 + gyu*0.42, mlu = Math.hypot(mxu,myu)||1;
+          tx = om.x + (mxu/mlu)*46;
+          ty = om.y + (myu/mlu)*30;
         } else if(p.role==='def'){
           // defans hatti: topun gerisinde kompakt
           var gap = 300 - BOT_STYLE[t]*75;
@@ -1803,8 +1823,10 @@ function botThink(){
 
         tx = Math.max(PX0+40, Math.min(PX1-40, tx));
         ty = Math.max(PY0+30, Math.min(PY1-30, ty));
-        var fSprint = DIFFS[BOT_DIFF].sprint && p.stamina>DIFFS[BOT_DIFF].stamMin*0.5 && !p.lock &&
-                      Math.hypot(tx-p.x,ty-p.y)>55;
+        var isPress = (!weHave && p===support2);
+        var moveDist = Math.hypot(tx-p.x, ty-p.y);
+        var fSprint = DIFFS[BOT_DIFF].sprint && !p.lock && p.stamina > DIFFS[BOT_DIFF].stamMin*0.4 &&
+                      (isPress ? moveDist > 40 : moveDist > 150);   // baskici kosar; kucuk ayarlarda yurunur
         moveBot(p, tx, ty, fSprint);
       }
       slot++;
@@ -1982,7 +2004,7 @@ function bestPassMate(p, t){
     if(score > bestScore){ bestScore=score; best=m; }
   }
   // baski yoksa ve secenek zayifsa pas yerine devam et
-  if(best && press===0 && bestScore < 60) return null;
+  if(best && press===0 && bestScore < 25) return null;   // baski yokken bile daha sik pas ver
   return best;
 }
 
@@ -2215,7 +2237,7 @@ function startGameUI(){
   el('lobby').style.display='none';
   el('gameWrap').style.display='flex';
   updateCtrlHint();
-  setTimeout(fitScale, 30);
+  refitSoon();   // tek deneme yerine 30/120/350/800ms tekrar -> layout otursun, "cok uzaktan" bug'i biter
   if(!running){ running = true; lastT = performance.now(); requestAnimationFrame(loop); }
 }
 
@@ -3242,7 +3264,7 @@ function renderLobby(){
     var lab = document.createElement('label');
     lab.style.cssText='font-size:11px;color:#9FB3BB';
     var cap = iAmCaptain(team);
-    lab.textContent = 'Bot style' + (cap?' (captain)':'');
+    lab.textContent = 'Team tactic' + (cap?' (captain)':'');
     var sel = document.createElement('select');
     sel.style.cssText='padding:5px 8px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:12px';
     ['Defensive','Balanced','Offensive'].forEach(function(t,i){
