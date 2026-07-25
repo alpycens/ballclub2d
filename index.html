@@ -1402,7 +1402,7 @@ function botThink(){
       if(hp.shootReq > 0){ cmdPlayer = hp; cmdType = 'shoot'; break; }
     }
     // Baslama vurusu bizde ve takimda insan varsa: vurusu insan yapsin, botlar beklesin
-    var koWaitForHuman = G.ko && (G.koTeam === t) && team.some(function(x){ return !x.bot; });
+    var koWaitForHuman = G.ko && (G.koTeam === t) && team.some(function(x){ return !x.bot && !x.keeper; });
     var chaser=null, bd=1e9;
     if(!humanHolder && !koWaitForHuman){
       for(var i=0;i<team.length;i++){
@@ -1946,8 +1946,8 @@ function hostOnData(conn, msg){
     if(s){
       if(msg.a==='team' && (msg.team===0||msg.team===1||msg.team===2)){ s.team=msg.team; rosterChanged(); }
       else if(msg.a==='pos' && (msg.pos==='gk'||msg.pos==='def'||msg.pos==='mid'||msg.pos==='fwd')){
-        if(!(msg.pos==='gk' && teamKeeper(s.team, s.id))) s.pos=msg.pos;
-        rosterChanged();
+        if(msg.pos==='gk'){ LOBBY.roster.forEach(function(x){ if(x.team===s.team && x!==s && x.pos==='gk') x.pos='mid'; }); }
+        s.pos=msg.pos; rosterChanged();
       }
       else if(msg.a==='kit'){
         s.kit = cleanKit(msg.kit);
@@ -2426,41 +2426,7 @@ function render(v){
     ctx.globalAlpha = 1;
   }
 
-  // mini harita (sag alt): tum saha + oyuncular
-  (function(){
-    var mw = 148, mh = Math.round(mw * (H/W));
-    var mx = VIEW_W - mw - 12, my = VIEW_H - mh - 12;
-    var sx = mw/W, sy = mh/H;
-    ctx.globalAlpha = 0.82;
-    ctx.fillStyle = '#1B2125';
-    ctx.fillRect(mx-3, my-3, mw+6, mh+6);
-    ctx.fillStyle = '#5E7A4D';
-    ctx.fillRect(mx, my, mw, mh);
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
-    ctx.strokeRect(mx + PX0*sx, my + PY0*sy, (PX1-PX0)*sx, (PY1-PY0)*sy);
-    ctx.beginPath();
-    ctx.moveTo(mx + (W/2)*sx, my + PY0*sy); ctx.lineTo(mx + (W/2)*sx, my + PY1*sy); ctx.stroke();
-    // kaleler
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillRect(mx + PX0*sx - 2, my + GY0*sy, 3, (GY1-GY0)*sy);
-    ctx.fillRect(mx + PX1*sx - 1, my + GY0*sy, 3, (GY1-GY0)*sy);
-    // oyuncular
-    for(var i=0;i<v.p.length;i++){
-      var q = v.p[i];
-      ctx.fillStyle = (v.tc && v.tc[q.t]) ? v.tc[q.t] : TEAM_COL[q.t];
-      var r = (q.i===myPid) ? 3.4 : 2.4;
-      ctx.beginPath(); ctx.arc(mx + q.x*sx, my + q.y*sy, r, 0, Math.PI*2); ctx.fill();
-      if(q.i===myPid){ ctx.strokeStyle='#FFFFFF'; ctx.lineWidth=1.2; ctx.stroke(); }
-    }
-    // top
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath(); ctx.arc(mx + v.b[0]*sx, my + v.b[1]*sy, 2.2, 0, Math.PI*2); ctx.fill();
-    // kamera cercevesi
-    var halfW = (VIEW_W/2)/CAM.zoom, halfH = (VIEW_H/2)/CAM.zoom;
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;
-    ctx.strokeRect(mx + (CAM.x-halfW)*sx, my + (CAM.y-halfH)*sy, halfW*2*sx, halfH*2*sy);
-    ctx.globalAlpha = 1;
-  })();
+  // mini harita kaldirildi (kullanici istegi)
 
   el('scR').textContent=v.s[0]; el('scB').textContent=v.s[1];
   var dots = document.querySelectorAll ? null : null;
@@ -3106,7 +3072,7 @@ function renderLobby(){
   el('posSel').disabled = !ms || ms.team===2;
   // takimda zaten kaleci varsa "Goalkeeper" secenegini kilitle
   var gkOpt = el('posSel').querySelector ? el('posSel').querySelector('option[value="gk"]') : null;
-  if(gkOpt) gkOpt.disabled = !!(ms && ms.team!==2 && teamKeeper(ms.team, ms.id));
+  if(gkOpt) gkOpt.disabled = false;
   // baslat butonu: en az 1 kirmizi ve 1 mavi
   var st = el('lobStart');
   if(st){
@@ -3138,12 +3104,16 @@ function setMyTeam(team){
 }
 function setMyPos(pos){
   var s = mySlot();
-  if(pos==='gk' && s && teamKeeper(s.team, s.id)){
-    if(el('lobMsg')) el('lobMsg').textContent = 'This team already has a goalkeeper.';
-    el('posSel').value = (s && s.pos) ? s.pos : 'mid';   // secimi geri al
-    return;
+  if(role==='host'){
+    if(s){
+      if(pos==='gk'){
+        // ben kaleci oluyorum: takimdaki diger tum kalecileri (bot/insan) orta sahaya al
+        LOBBY.roster.forEach(function(x){ if(x.team===s.team && x!==s && x.pos==='gk') x.pos='mid'; });
+      }
+      s.pos=pos;
+    }
+    rosterChanged(); pushLobby(); renderLobby();
   }
-  if(role==='host'){ if(s){ s.pos=pos; } rosterChanged(); pushLobby(); renderLobby(); }
   else if(hostConn && hostConn.open){ hostConn.send({t:'lreq', a:'pos', pos:pos}); }
 }
 var botCounter = 0;
@@ -3235,10 +3205,22 @@ function fsActive(){
 }
 var VIEW_W_BASE = 1240, VIEW_H_BASE = 580;
 
+var kbLocked = false;
 function fitScale(){
   var sc = el('gameScale'); if(!sc || el('gameWrap').style.display==='none') return;
   var fs = fsActive();
   document.body.classList.toggle('fsmode', !!fs);
+  // API tam ekranda Esc, tarayiciyi tam ekrandan cikarir. Escape tusunu kilitleyerek
+  // Esc'i kendimiz yakalariz (lobi ac/kapat) ve tam ekran korunur. (Chromium destekler)
+  if(isFs()){
+    if(!kbLocked && navigator.keyboard && navigator.keyboard.lock){
+      try { navigator.keyboard.lock(['Escape']); } catch(e){}
+      kbLocked = true;
+    }
+  } else if(kbLocked){
+    try { if(navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock(); } catch(e){}
+    kbLocked = false;
+  }
 
   if(fs){
     // TAM EKRAN: tuval ekranin tamamini kaplar, cubuklar/sohbet uzerine biner
