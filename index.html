@@ -53,7 +53,7 @@
   #joinRow input { text-transform:uppercase; }
   #menuMsg { margin-top:12px; font-size:12px; color:#E5B356; min-height:16px; }
   #gameWrap { display:none; flex-direction:column; align-items:center; margin-top:12px; position:relative; }
-  #topRight { display:flex; align-items:center; gap:8px; }
+  #topRight { display:flex; align-items:center; gap:6px; margin-left:auto; }
   .miniBtn { flex:0 0 auto; padding:5px 12px; font-size:12px; }
   #setPanel { display:none; position:absolute; top:44px; right:0; z-index:10; width:250px;
               background:#252E33; border:1px solid #3C4A52; border-radius:8px; padding:14px 16px;
@@ -92,12 +92,19 @@
   #scoreBox { font-size:18px; font-weight:700; display:flex; align-items:center; gap:10px;
               position:absolute; left:50%; transform:translateX(-50%);
               text-shadow:0 1px 3px rgba(0,0,0,0.8); }
-  #hudKeys { font-size:10.5px; color:#9FB3BB; line-height:1.4; white-space:nowrap;
-             display:flex; align-items:center; text-shadow:0 1px 2px rgba(0,0,0,0.75); }
-  #hudKeys b { display:inline-block; min-width:12px; padding:0 4px; margin:0 3px 0 9px;
-               background:rgba(27,33,37,0.6); border:1px solid #4C5E68; border-radius:3px;
-               color:#E5B356; font-family:monospace; font-weight:700; font-size:10px; }
-  #hudKeys b:first-child { margin-left:0; }
+  .hudChip { display:inline-flex; align-items:center; gap:5px; padding:5px 9px;
+             background:rgba(27,33,37,0.55); border:1px solid rgba(76,94,104,0.7);
+             border-radius:6px; color:#C7D3D9; font-size:12px; font-weight:600;
+             font-family:inherit; cursor:pointer; line-height:1;
+             transition:background .12s, border-color .12s, color .12s; }
+  .hudChip:hover { background:rgba(91,140,62,0.32); border-color:#5B8C3E; color:#EAF3E0; }
+  .hudChip:disabled { opacity:0.4; cursor:default; }
+  .hudChip.icon { padding:5px 7px; }
+  .hudChip svg { display:block; width:15px; height:15px; }
+  .hudChip .cap { display:inline-block; min-width:13px; padding:0 4px; text-align:center;
+                  background:#1B2125; border:1px solid #4C5E68; border-radius:3px;
+                  color:#E5B356; font-family:monospace; font-weight:700; font-size:10.5px;
+                  line-height:16px; }
   .tdot { width:12px; height:12px; border-radius:50%; display:inline-block; }
   #roomInfo { font-size:12px; color:#9FB3BB; user-select:all; }
   canvas { background:#5E7A4D; display:block; border:1px solid #3C4A52; }
@@ -370,7 +377,6 @@
 <div id="gameWrap">
  <div id="gameScale">
   <div id="topBar">
-    <div id="hudKeys"></div>
     <div id="scoreBox">
       <span class="tdot" id="dotR" style="background:#E56E56"></span><span id="scR">0</span>
       <span style="color:#6E8089">-</span>
@@ -379,12 +385,14 @@
     </div>
     <div id="topRight">
       <div id="roomInfo"></div>
-      <button class="miniBtn" id="copyBtn" style="display:none">Kopyala</button>
-      <button class="miniBtn" id="lobbyBtn">Lobby</button>
-      <button class="miniBtn" id="keysBtn">Keys</button>
-      <button class="miniBtn" id="gearBtn">Settings</button>
-      <button class="miniBtn" id="sndBtn">Sound: On</button>
-      <button class="miniBtn" id="fsBtn">Fullscreen</button>
+      <button class="hudChip" id="copyBtn" style="display:none">Copy</button>
+      <button class="hudChip" id="lobbyBtn"><span class="cap">Esc</span><span>Lobby</span></button>
+      <button class="hudChip" id="pauseChip"><span class="cap">P</span><span>Pause</span></button>
+      <button class="hudChip" id="fsBtn"><span class="cap">F</span><span>Fullscreen</span></button>
+      <button class="hudChip icon" id="chatChip" title="Chat (Enter)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-11.5 8L3 21l1.5-6.5A8.5 8.5 0 1 1 21 11.5z"/></svg></button>
+      <button class="hudChip icon" id="keysBtn" title="Key bindings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
+      <button class="hudChip icon" id="gearBtn" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      <button class="hudChip icon" id="sndBtn" title="Sound"></button>
     </div>
   </div>
   <div id="keyPanel">
@@ -3139,7 +3147,7 @@ function setMyPos(pos){
   else if(hostConn && hostConn.open){ hostConn.send({t:'lreq', a:'pos', pos:pos}); }
 }
 var botCounter = 0;
-var BOT_NAMES = ['Kaya','Demir','Aslan','Yildiz','Celik','Sahin','Kurt','Kartal','Toprak','Deniz'];
+var BOT_NAMES = ['Silva','Kane','Diaz','Rossi','Lopez','Costa','Vidal','Berg','Suarez','Moreno'];
 var ROLE_CYCLE = ['def','mid','fwd','mid'];
 function addBot(team){
   if(role!=='host') return;
@@ -3457,16 +3465,6 @@ function updateCtrlHint(){
     ' &nbsp;<span>Lobby</span> ' + K('lobby') +
     ' &nbsp;<span>Pause</span> ' + K('pause') +
     ' &nbsp;<span>Camera</span> <b>1</b><b>2</b><b>3</b><b>4</b>';
-  updateHudKeys();
-}
-
-function updateHudKeys(){
-  var e = el('hudKeys'); if(!e) return;
-  e.innerHTML =
-    '<b>F</b>Fullscreen' +
-    '<b>' + keyLabelShort(binds.lobby) + '</b>Lobby' +
-    '<b>' + keyLabelShort(binds.pause) + '</b>Pause' +
-    '<b>Enter</b>Chat';
 }
 
 function renderKeyRows(){
@@ -3791,9 +3789,11 @@ el('pauseBtn2').onclick = function(){
 };
 
 
+var SVG_SPK_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a9 9 0 0 1 0 12"/></svg>';
+var SVG_SPK_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>';
 function updateSndBtn(){
   var b = el('sndBtn');
-  if(b) b.textContent = sfxOn ? 'Sound: On' : 'Sound: Off';
+  if(b){ b.innerHTML = sfxOn ? SVG_SPK_ON : SVG_SPK_OFF; b.title = sfxOn ? 'Sound: On' : 'Sound: Off'; }
 }
 el('sndBtn').onclick = function(){
   sfxOn = !sfxOn;
@@ -3802,6 +3802,17 @@ el('sndBtn').onclick = function(){
   updateSndBtn();
 };
 updateSndBtn();
+
+// Pause cipi: pauseBtn2 ile ayni davranis (host durdur/devam, istemci host'a ilet)
+(function(){
+  var pc = el('pauseChip');
+  if(pc) pc.onclick = function(){
+    if(role==='host'){ togglePause(); }
+    else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, tp:1}); }
+  };
+  var cc = el('chatChip');
+  if(cc) cc.onclick = function(){ var ci=el('chatInp'); if(ci) ci.focus(); };
+})();
 
 function toggleFs(){
   var el0 = document.documentElement;
