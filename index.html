@@ -141,7 +141,7 @@
   body.fsmode { justify-content:flex-start; align-items:flex-start; padding:0; margin:0; overflow:hidden; }
   body.fsmode #gameWrap { margin-top:0; width:100vw; height:100vh; }
   body.fsmode #gameScale { position:relative; width:100vw; height:100vh; }
-  body.fsmode #menu, body.fsmode #lobby { margin-top:0; }
+  body.fsmode #menu, body.fsmode #lobby { margin-top:0; margin-left:auto; margin-right:auto; }
   /* tam ekranda ust/alt cubuk ve sohbet tuvalin uzerine biner */
   body.fsmode #topBar { position:absolute; top:0; left:0; z-index:5;
     background:rgba(37,46,51,0.82); border:none; border-radius:0; backdrop-filter:blur(2px); }
@@ -1595,8 +1595,35 @@ function botThink(){
         var wKo = avoidBallPath(p, hx0, hy0);
         if(Math.hypot(wKo.x-ball.x, wKo.y-ball.y) < 70){ wKo.x = hx0; wKo.y = hy0; }
         moveBot(p, wKo.x, wKo.y, false);
+      } else if(callOrder && humanHolder){
+        // Alt + top insandayken: topa gelme, kaleye dogru hucum kosusu yap (pas secenegi ol)
+        var Da = DIFFS[BOT_DIFF];
+        var fwdDir = (t===0 ? 1 : -1);
+        var oppGX = (t===0 ? PX1 : PX0);
+        var lane = (slot % 2 === 0) ? -1 : 1;
+        var tierY = 90 + Math.floor(slot/2) * 70;
+        var runX, runY;
+        if(p.role === 'fwd'){
+          runX = oppGX - fwdDir*95;                       // rakip ceza sahasi civari
+          runY = (lane < 0) ? (GY0 + 30) : (GY1 - 30);    // kale koselerine kacis
+        } else if(p.role === 'def'){
+          runX = ball.x + fwdDir*90;                      // olculu katilim
+          runY = ball.y + lane*Math.min(tierY, 150);
+        } else {
+          runX = ball.x + fwdDir*205;                     // orta saha: ileri kosu
+          runY = ball.y + lane*Math.min(tierY+40, 190);
+        }
+        runX = Math.max(PX0+55, Math.min(PX1-55, runX));
+        runY = Math.max(PY0+30, Math.min(PY1-30, runY));
+        // topa/insana yapisip ayagindaki topa mudahale etmesin
+        var ddx = runX-ball.x, ddy = runY-ball.y, dd = Math.hypot(ddx,ddy)||1;
+        if(dd < 120){ var ss=120/dd; runX = ball.x+ddx*ss; runY = ball.y+ddy*ss;
+          runX = Math.max(PX0+55, Math.min(PX1-55, runX));
+          runY = Math.max(PY0+30, Math.min(PY1-30, runY)); }
+        var aSprint = Da.sprint && p.stamina > 4 && !p.lock;
+        moveBot(p, runX, runY, aSprint);
       } else if((pressOrder && !humanHolder) || callOrder){
-        // V: topa baski · Alt: topa git (top bizdeyken bile calisir, botlari harekete gecirir)
+        // V: topa baski · Alt (top bizde degilken): topa git
         var Dp = DIFFS[BOT_DIFF];
         var pSprint = Dp.sprint && p.stamina > 4 && !p.lock;
         moveBot(p, ball.x, ball.y, pSprint);
@@ -1910,7 +1937,10 @@ function hostOnData(conn, msg){
     var s = LOBBY.roster.find(function(x){return x.id===conn.peer;});
     if(s){
       if(msg.a==='team' && (msg.team===0||msg.team===1||msg.team===2)){ s.team=msg.team; rosterChanged(); }
-      else if(msg.a==='pos' && (msg.pos==='gk'||msg.pos==='fld')){ s.pos=msg.pos; rosterChanged(); }
+      else if(msg.a==='pos' && (msg.pos==='gk'||msg.pos==='def'||msg.pos==='mid'||msg.pos==='fwd')){
+        if(!(msg.pos==='gk' && teamKeeper(s.team, s.id))) s.pos=msg.pos;
+        rosterChanged();
+      }
       else if(msg.a==='kit'){
         s.kit = cleanKit(msg.kit);
         applyKitLive(conn.peer, s.kit);
@@ -2883,6 +2913,20 @@ function showLobby(){ el('menu').style.display='none'; el('lobby').style.display
 
 function mySlot(){ return LOBBY.roster.find(function(s){return s.id===myPid;}); }
 
+// bir takimda kaleci olan slotu dondur (exceptId haric) - null ise kaleci yok
+function teamKeeper(team, exceptId){
+  return LOBBY.roster.find(function(s){ return s.team===team && s.pos==='gk' && s.id!==exceptId; }) || null;
+}
+// her takimda en fazla 1 kaleci kalsin; fazlasi orta sahaya alinir (insan kaleci korunur)
+function normalizeKeepers(){
+  [0,1].forEach(function(t){
+    var gks = LOBBY.roster.filter(function(s){ return s.team===t && s.pos==='gk'; });
+    if(gks.length <= 1) return;
+    var keep = gks.find(function(s){ return !s.bot; }) || gks[0];
+    gks.forEach(function(s){ if(s!==keep) s.pos = 'mid'; });
+  });
+}
+
 // takim kaptani = o takimdaki ilk insan (yoksa null)
 function captainOf(team){
   var id = LOBBY.cfg['cap'+team];
@@ -2899,6 +2943,7 @@ function setCaptain(team, id){
 
 // maç sürerken roster degisirse oyunu rostera gore yeniden kur (kickoff)
 function rosterChanged(){
+  normalizeKeepers();
   if(role==='host' && LOBBY.started){
     var sc = G ? G.score.slice() : [0,0];
     buildGameFromRoster();
@@ -2957,7 +3002,9 @@ function renderLobby(){
       pb.style.cssText='width:auto;padding:2px 6px;background:#3C4A52';
       pb.textContent = ({gk:'KL',def:'DF',mid:'OS',fwd:'FV'})[s.pos] || 'OS';
       pb.title = 'Change position';
-      pb.onclick=function(){ var seq=['gk','def','mid','fwd']; s.pos = seq[(seq.indexOf(s.pos)+1)%seq.length]; rosterChanged(); pushLobby(); renderLobby(); };
+      pb.onclick=function(){ var seq=['gk','def','mid','fwd']; var i=seq.indexOf(s.pos);
+        do { i=(i+1)%seq.length; } while(seq[i]==='gk' && teamKeeper(s.team, s.id));
+        s.pos = seq[i]; rosterChanged(); pushLobby(); renderLobby(); };
       row.appendChild(pb);
       var xb=document.createElement('button'); xb.className='xb'; xb.textContent='×';
       xb.onclick=function(){ removeBot(s.id); };
@@ -3049,6 +3096,9 @@ function renderLobby(){
   var ms = mySlot();
   el('posSel').value = (ms && ms.pos) ? ms.pos : 'mid';
   el('posSel').disabled = !ms || ms.team===2;
+  // takimda zaten kaleci varsa "Goalkeeper" secenegini kilitle
+  var gkOpt = el('posSel').querySelector ? el('posSel').querySelector('option[value="gk"]') : null;
+  if(gkOpt) gkOpt.disabled = !!(ms && ms.team!==2 && teamKeeper(ms.team, ms.id));
   // baslat butonu: en az 1 kirmizi ve 1 mavi
   var st = el('lobStart');
   if(st){
@@ -3079,7 +3129,13 @@ function setMyTeam(team){
   else if(hostConn && hostConn.open){ hostConn.send({t:'lreq', a:'team', team:team}); }
 }
 function setMyPos(pos){
-  if(role==='host'){ var s=mySlot(); if(s){ s.pos=pos; } rosterChanged(); pushLobby(); renderLobby(); }
+  var s = mySlot();
+  if(pos==='gk' && s && teamKeeper(s.team, s.id)){
+    if(el('lobMsg')) el('lobMsg').textContent = 'This team already has a goalkeeper.';
+    el('posSel').value = (s && s.pos) ? s.pos : 'mid';   // secimi geri al
+    return;
+  }
+  if(role==='host'){ if(s){ s.pos=pos; } rosterChanged(); pushLobby(); renderLobby(); }
   else if(hostConn && hostConn.open){ hostConn.send({t:'lreq', a:'pos', pos:pos}); }
 }
 var botCounter = 0;
