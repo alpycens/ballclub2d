@@ -942,7 +942,7 @@ function buildGameFromRoster(){
   applyCfgLocal();
   G = { players:[], ball:{x:W/2,y:H/2,vx:0,vy:0,cw:null,ct:0,cd:null,spin:0,kickGrace:0}, score:[0,0],
         phase:'play', ptimer:0, msg:'', over:false, paused:false,
-        koTeam:0, ko:true, t:0, clock:0, lastTouch:null, goalN:0, resumeIn:0 };
+        koTeam:0, ko:true, t:0, clock:0, started:false, lastTouch:null, goalN:0, resumeIn:0 };
   LOBBY.roster.forEach(function(s){
     if(s.team!==0 && s.team!==1) return;          // seyirci sahada degil
     var p = newPlayer(s.id, s.name, s.team, !!s.bot, s.bot ? null : s.stats);
@@ -1084,9 +1084,25 @@ function resolveBallPlayers(nearWall){
       var qm = q.mass || 1, mb = BALL_MASS;
       var wB = qm/(qm+mb);        // topun kutle payi (agir top -> kucuk)
 
-      // KONUM: duzeltmenin tamamini TOP alir, oyuncu GERI ITILMEZ.
-      // Boylece topa yaslanip yapisabilir, etrafinda donebilirsin.
-      ball.x += nx*overlap;  ball.y += ny*overlap;
+      // KONUM: duzeltmeyi TOP alir (oyuncu geri itilmez) -> topa yaslanip donebilirsin.
+      // Ama top bir DUVARA yaslanmissa radyal itme onu duvara gomer (duvar geri klipler -> yapisma,
+      // donemezsin). O yuzden duvardayken ayrismayi DUVAR BOYUNCA (tegetsel) yap: top yana kayar.
+      var mouthY0 = (ball.y>GY0 && ball.y<GY1);
+      var atTop0 = ball.y <= PY0+BR+0.6, atBot0 = ball.y >= PY1-BR-0.6;
+      var atLeft0 = (ball.x <= PX0+BR+0.6) && !mouthY0, atRight0 = (ball.x >= PX1-BR-0.6) && !mouthY0;
+      if((atTop0 && ny < -0.12) || (atBot0 && ny > 0.12)){
+        var dyy = ball.y - q.y;
+        var needX = Math.sqrt(Math.max(0, minD*minD - dyy*dyy)) + 0.4;
+        var tsg = (dx>=0?1:-1); if(Math.abs(dx)<0.6) tsg = (q.vx>=0?1:-1);
+        ball.x = q.x + tsg*needX;                    // ust/alt duvar -> yatay kaydir
+      } else if((atLeft0 && nx < -0.12) || (atRight0 && nx > 0.12)){
+        var dxx = ball.x - q.x;
+        var needY = Math.sqrt(Math.max(0, minD*minD - dxx*dxx)) + 0.4;
+        var tsg2 = (dy>=0?1:-1); if(Math.abs(dy)<0.6) tsg2 = (q.vy>=0?1:-1);
+        ball.y = q.y + tsg2*needY;                   // sol/sag duvar -> dikey kaydir
+      } else {
+        ball.x += nx*overlap;  ball.y += ny*overlap;
+      }
 
       var bspPre = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);   // temas oncesi top hizi
       var rel = (ball.vx-q.vx)*nx + (ball.vy-q.vy)*ny;
@@ -1132,6 +1148,7 @@ function resolveBallPlayers(nearWall){
       ball.cw = null; ball.ct = 0; ball.cd = null; ball.spin = 0;   // dokunus falsoyu bitirir
       G.lastTouch = { id:q.id, team:q.team, name:q.name };           // gol sahibi icin
       G.ko = false;
+      if(!G.started) G.started = true;   // sure ancak topa ilk vurulunca baslar
       hits++; sumNx += nx; sumNy += ny;
       deep.push(q);
     }
@@ -1193,7 +1210,7 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
   if(G.phase==='goal' || G.phase==='end'){
     G.ptimer -= dt*TICK_MS;
     if(G.ptimer<=0){
-      if(G.phase==='end'){ G.score=[0,0]; G.clock=0; G.over=false; }
+      if(G.phase==='end'){ G.score=[0,0]; G.clock=0; G.over=false; G.started=false; }
       G.phase='play'; G.msg='';
       resetPositions();
     }
@@ -1204,8 +1221,10 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
   if(G.ball.kickGrace > 0) G.ball.kickGrace = Math.max(0, G.ball.kickGrace - dt*TICK_MS);
 
   if(play){
-    G.clock += dt*TICK_MS;
-    if(matchMins>0 && G.clock >= matchMins*60000){ endMatchByTime(); }
+    if(G.started){
+      G.clock += dt*TICK_MS;
+      if(matchMins>0 && G.clock >= matchMins*60000){ endMatchByTime(); }
+    }
   }
 
   // Once oyuncu komutlarini isle, SONRA botlar karar versin.
