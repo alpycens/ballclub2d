@@ -596,7 +596,7 @@ function cleanBotStatsTable(t){
   return out;
 }
 var STAT_KEYS = ['shot','curve','sprint','drib','power','energy','ftouch'];
-var STAT_LABELS = { shot:'Long ball power', curve:'Curve', sprint:'Sprint speed', drib:'Dribbling speed', power:'Strength (push/resist)', energy:'Stamina', ftouch:'First touch (trap control)' };
+var STAT_LABELS = { shot:'Long ball power', curve:'Curve', sprint:'Sprint speed', drib:'Dribbling speed', power:'Strength (push/resist)', energy:'Stamina', ftouch:'Ball control' };
 var STAT_DESC = {
   shot:'Power of your long passes and shots — harder, longer strikes.',
   curve:'How much bend / swerve you can put on the ball.',
@@ -3308,7 +3308,7 @@ function attachBotDrag(g, svg, spots, ox, oy, innerW, innerH){
 function renderStatRadar(hostId){
   var host = el(hostId); if(!host) return;
   var vals = STAT_KEYS.map(function(k){ var v=myStats[k]; return (typeof v==='number'&&!isNaN(v))?v:STAT_MIN; });
-  var labs = ['Shoot','Curve','Sprint','Dribbling','Strength','Stamina','First touch'];
+  var labs = ['Shoot','Curve','Sprint','Dribbling','Strength','Stamina','Ball control'];
   var cx=100, cy=100, R=60, n=STAT_KEYS.length;
   function pt(i, r){ var a=-Math.PI/2 + i*2*Math.PI/n; return [cx+Math.cos(a)*r, cy+Math.sin(a)*r]; }
   var s='<svg viewBox="-18 -2 236 204" class="statRadar" preserveAspectRatio="xMidYMid meet">';
