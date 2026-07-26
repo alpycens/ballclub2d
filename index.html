@@ -1084,25 +1084,9 @@ function resolveBallPlayers(nearWall){
       var qm = q.mass || 1, mb = BALL_MASS;
       var wB = qm/(qm+mb);        // topun kutle payi (agir top -> kucuk)
 
-      // KONUM: duzeltmeyi TOP alir (oyuncu geri itilmez) -> topa yaslanip donebilirsin.
-      // Ama top bir DUVARA yaslanmissa radyal itme onu duvara gomer (duvar geri klipler -> yapisma,
-      // donemezsin). O yuzden duvardayken ayrismayi DUVAR BOYUNCA (tegetsel) yap: top yana kayar.
-      var mouthY0 = (ball.y>GY0 && ball.y<GY1);
-      var atTop0 = ball.y <= PY0+BR+0.6, atBot0 = ball.y >= PY1-BR-0.6;
-      var atLeft0 = (ball.x <= PX0+BR+0.6) && !mouthY0, atRight0 = (ball.x >= PX1-BR-0.6) && !mouthY0;
-      if((atTop0 && ny < -0.12) || (atBot0 && ny > 0.12)){
-        var dyy = ball.y - q.y;
-        var needX = Math.sqrt(Math.max(0, minD*minD - dyy*dyy)) + 0.4;
-        var tsg = (dx>=0?1:-1); if(Math.abs(dx)<0.6) tsg = (q.vx>=0?1:-1);
-        ball.x = q.x + tsg*needX;                    // ust/alt duvar -> yatay kaydir
-      } else if((atLeft0 && nx < -0.12) || (atRight0 && nx > 0.12)){
-        var dxx = ball.x - q.x;
-        var needY = Math.sqrt(Math.max(0, minD*minD - dxx*dxx)) + 0.4;
-        var tsg2 = (dy>=0?1:-1); if(Math.abs(dy)<0.6) tsg2 = (q.vy>=0?1:-1);
-        ball.y = q.y + tsg2*needY;                   // sol/sag duvar -> dikey kaydir
-      } else {
-        ball.x += nx*overlap;  ball.y += ny*overlap;
-      }
+      // KONUM: duzeltmenin tamamini TOP alir, oyuncu GERI ITILMEZ.
+      // Boylece topa yaslanip yapisabilir, etrafinda donebilirsin (duvarda da).
+      ball.x += nx*overlap;  ball.y += ny*overlap;
 
       var bspPre = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);   // temas oncesi top hizi
       var rel = (ball.vx-q.vx)*nx + (ball.vy-q.vy)*ny;
@@ -1425,12 +1409,14 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     }
 
     // top duvarları: üst/alt saha çizgisi, sol/sağ kale ağzı hariç
-    if(ball.y < PY0+BR){ ball.y = PY0+BR; ball.vy = -ball.vy*BOUNCE; }
-    if(ball.y > PY1-BR){ ball.y = PY1-BR; ball.vy = -ball.vy*BOUNCE; }
+    // YAVAS gelen topu (dribbling) sektirme -> duvara yaslanip kalir, etrafinda donebilirsin.
+    // HIZLI gelen top (sut/pas) yine seker.
+    if(ball.y < PY0+BR){ ball.y = PY0+BR; ball.vy = (ball.vy < -2.6) ? -ball.vy*BOUNCE : 0; }
+    if(ball.y > PY1-BR){ ball.y = PY1-BR; ball.vy = (ball.vy >  2.6) ? -ball.vy*BOUNCE : 0; }
     var mouth = ball.y > GY0 && ball.y < GY1;
     if(!mouth){
-      if(ball.x < PX0+BR){ ball.x = PX0+BR; ball.vx = -ball.vx*BOUNCE; }
-      if(ball.x > PX1-BR){ ball.x = PX1-BR; ball.vx = -ball.vx*BOUNCE; }
+      if(ball.x < PX0+BR){ ball.x = PX0+BR; ball.vx = (ball.vx < -2.6) ? -ball.vx*BOUNCE : 0; }
+      if(ball.x > PX1-BR){ ball.x = PX1-BR; ball.vx = (ball.vx >  2.6) ? -ball.vx*BOUNCE : 0; }
     } else {
       // kale içi arka ve yan ağlar
       if(ball.x < PX0-GOAL_DEPTH+BR){ ball.x = PX0-GOAL_DEPTH+BR; ball.vx = -ball.vx*0.4; }
