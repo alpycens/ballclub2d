@@ -582,7 +582,16 @@ function cleanBotStatsTable(t){
   return out;
 }
 var STAT_KEYS = ['shot','curve','sprint','drib','power','energy','ftouch'];
-var STAT_LABELS = { shot:'Long ball power', curve:'Curve', sprint:'Sprint speed', drib:'Dribbling speed', power:'Strength (push/resist)', energy:'Max energy (sprint time)', ftouch:'First touch (trap control)' };
+var STAT_LABELS = { shot:'Long ball power', curve:'Curve', sprint:'Sprint speed', drib:'Dribbling speed', power:'Strength (push/resist)', energy:'Stamina', ftouch:'First touch (trap control)' };
+var STAT_DESC = {
+  shot:'Power of your long passes and shots — harder, longer strikes.',
+  curve:'How much bend / swerve you can put on the ball.',
+  sprint:'Your top speed while sprinting.',
+  drib:'Your movement speed while carrying the ball.',
+  power:'Strength in duels — push others and resist being pushed off the ball.',
+  energy:'How long you can keep sprinting before running out of stamina.',
+  ftouch:'Control fast incoming balls without them bouncing off — higher = cleaner traps, even at speed.'
+};
 var STAT_MIN = 1, STAT_MAX = 10, STAT_TOTAL = 45;
 function cleanStats(s){
   var o = {}, sum = 0;
@@ -3038,7 +3047,7 @@ function buildStatRows(rowsId, leftId){
     lf.style.color = locked ? '#8FA0A8' : '#E5B356';
   }
   STAT_KEYS.forEach(function(k){
-    var row = document.createElement('div'); row.className='statRow';
+    var row = document.createElement('div'); row.className='statRow'; row.title = STAT_DESC[k] || '';
     var nm = document.createElement('span'); nm.className='sname'; nm.textContent = STAT_LABELS[k];
     var minus = document.createElement('button'); minus.textContent='−';
     minus.disabled = locked || myStats[k] <= STAT_MIN;
@@ -3088,6 +3097,7 @@ function renderBotStatRows(){
   STAT_KEYS.forEach(function(k){
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:6px;margin:3px 0';
+    row.title = STAT_DESC[k] || '';
     var lab = document.createElement('span');
     lab.style.cssText = 'flex:1;font-size:11px;color:#9FB3BB';
     lab.textContent = STAT_LABELS[k];
