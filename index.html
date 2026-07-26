@@ -1009,13 +1009,10 @@ function enforceKickoffZones(){
     var dx = p.x-cx, dy = p.y-cy, cd = Math.sqrt(dx*dx+dy*dy);
     if(p.team === G.koTeam){
       if(!p.bot){
-        // BASLAMA VURUSUNU YAPAN INSAN: yuvarlagin ICINDE kal (disari cikamaz), yay boyunca kayar
-        if(cd > CIRCLE_R && cd > 0.001){
-          var inx = dx/cd, iny = dy/cd;
-          p.x = cx + inx*CIRCLE_R; p.y = cy + iny*CIRCLE_R;   // ic kenara getir
-          var vin = p.vx*inx + p.vy*iny;                       // disari (radyal +) hiz
-          if(vin > 0){ p.vx -= vin*inx; p.vy -= vin*iny; }     // disari hizi sil, tegetsel kalsin
-        }
+        // BASLAMA VURUSUNU YAPAN INSAN: kendi yarisinda serbestce gezer, RAKIP yariya gecemez.
+        // Yuvarlagin kendi yarisindaki kismina girip merkezdeki topa ulasabilir. Yumusak duvar.
+        if(p.team===0){ if(p.x > cx){ p.x = cx; if(p.vx>0) p.vx=0; } }
+        else { if(p.x < cx){ p.x = cx; if(p.vx<0) p.vx=0; } }
       } else {
       // BOT (baslama vurusu takimi): kendi yarisi + TUM yuvarlak serbest.
       // Rakip yarida yalnizca yuvarlak icinde olabilir; disari cikinca yumusakca kayar.
@@ -1080,11 +1077,16 @@ function resolveBallPlayers(nearWall){
       //    Olcut TOPUN oyuncuya dogru hizidir; topa dogru KOSMAK sekme yaratmaz.
       var ballToward = -(ball.vx*nx + ball.vy*ny);
       if(ballToward > 2.0){
-        // FIRST TOUCH: trap esigine kadar gelen top sektirilmez (ayaga yatar), ustunde kademeli seker
+        // FIRST TOUCH: iki kademeli fayda ->
+        //  (a) trap esigi (fTouchMax): bu hiza kadar gelen top TAM sektirilmeden ayaga yatar,
+        //  (b) sekme tavani (eCeil): esigin ustundeki HIZLI toplarda bile first touch yuksekse
+        //      sekme daha az olur. Yani first touch arttikca hizli top da daha iyi kontrol edilir.
         var ftMax = q.fTouchMax || 2.2;
+        var ftq = Math.max(0, Math.min(1, (ftMax - 2.2) / (PASS_SPD*1.05 - 2.2)));   // 0..1 (ftouch 1..10)
+        var eCeil = 0.62 * (1 - 0.62*ftq);   // ftouch 1 -> 0.62 (tam seker) | ftouch 10 -> ~0.24 (hizli topu bile yatirir)
         var e;
-        if(ballToward <= ftMax){ e = 0.0; }   // kontrollu ilk dokunus: normal hiz silinir, top ayakta kalir
-        else { e = Math.min(0.62, 0.62 * (ballToward - ftMax) / (SHOOT_SPD - ftMax + 0.001)); }
+        if(ballToward <= ftMax){ e = 0.0; }  // kontrollu ilk dokunus: top ayakta kalir
+        else { e = eCeil * Math.min(1, (ballToward - ftMax) / (SHOOT_SPD*1.3 - ftMax + 0.001)); }
         ball.vx -= (1+e)*rel*nx;  ball.vy -= (1+e)*rel*ny;   // OYUNCU ETKILENMEZ
       }
 
@@ -2430,6 +2432,26 @@ function playKick(power, vol){
   } catch(e){}
 }
 
+// Chat bildirimi: yumusak, tatli iki notali kisa "ding"
+function playChat(){
+  if(!sfxOn) return;
+  initAudio();
+  if(!audioCtx) return;
+  var t = audioCtx.currentTime;
+  try {
+    [880, 1174.66].forEach(function(f, i){   // A5 -> D6
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f, t + i*0.075);
+      g.gain.setValueAtTime(0.0001, t + i*0.075);
+      g.gain.exponentialRampToValueAtTime(0.11, t + i*0.075 + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + i*0.075 + 0.22);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t + i*0.075); o.stop(t + i*0.075 + 0.24);
+    });
+  } catch(e){}
+}
+
 // Gol sesi: yukselen uc nota + kisa alkis benzeri gurultu kabarmasi
 function playGoal(){
   if(!sfxOn) return;
@@ -3601,6 +3623,7 @@ function lchat(name, team, text, sys){
   if(sys){ line.className='sys'; line.textContent=text; }
   else { var s=document.createElement('span'); s.className='cn t'+team; s.textContent=name+': '; line.appendChild(s); line.appendChild(document.createTextNode(text)); }
   log.appendChild(line); while(log.childNodes.length>50) log.removeChild(log.firstChild); log.scrollTop=log.scrollHeight;
+  if(!sys) playChat();
 }
 function lchatBroadcast(name, team, text, sys){
   var m={t:'lchatb', n:name, tm:team, x:text, sy:sys?1:0};
@@ -3707,6 +3730,7 @@ function addChat(name, team, text, sys){
   log.appendChild(line);
   while(log.childNodes.length > 60) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
+  if(!sys) playChat();
 }
 
 function chatBroadcast(name, team, text, sys){
