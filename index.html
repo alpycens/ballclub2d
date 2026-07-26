@@ -19,7 +19,20 @@
   #statBox .settitle { font-size:11px; letter-spacing:2px; color:#CDE6B4; }
   #statLeft { font-size:11px; color:#E5B356; font-weight:700; }
   .statRow { display:flex; align-items:center; gap:8px; margin:5px 0; }
-  .statRow .sname { flex:0 0 190px; font-size:13px; color:#B9C7CE; }
+  .statRow .sname { flex:0 0 210px; font-size:13px; color:#B9C7CE; }
+  .qtip { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px;
+          margin-left:6px; border-radius:50%; background:#3C4A52; color:#B9C7CE; font-size:10px;
+          font-weight:700; cursor:help; position:relative; vertical-align:middle; transition:background .12s, color .12s; }
+  .qtip:hover { background:#5B8C3E; color:#fff; }
+  .qtip::after { content:attr(data-tip); position:absolute; left:50%; bottom:135%; transform:translateX(-50%);
+                 background:#12181B; color:#E6EFE7; border:1px solid #4C5E68; border-radius:6px;
+                 padding:6px 9px; font-size:11px; font-weight:400; line-height:1.35; white-space:normal;
+                 width:190px; text-align:left; box-shadow:0 5px 16px rgba(0,0,0,0.55);
+                 opacity:0; visibility:hidden; transition:opacity .12s; pointer-events:none; z-index:60; }
+  .qtip::before { content:''; position:absolute; left:50%; bottom:135%; transform:translate(-50%,95%) rotate(45deg);
+                  width:7px; height:7px; background:#12181B; border-right:1px solid #4C5E68; border-bottom:1px solid #4C5E68;
+                  opacity:0; visibility:hidden; transition:opacity .12s; z-index:61; }
+  .qtip:hover::after, .qtip:hover::before { opacity:1; visibility:visible; }
   .statRow .sbar { flex:1; height:9px; background:#151B1E; border:1px solid #3C4A52; border-radius:4px; overflow:hidden; display:flex; gap:1px; padding:1px; }
   .statRow .seg { flex:1; background:#2C363B; border-radius:1px; }
   .statRow .seg.on { background:#5B8C3E; }
@@ -3043,8 +3056,10 @@ function buildStatRows(rowsId, leftId){
     lf.style.color = locked ? '#8FA0A8' : '#E5B356';
   }
   STAT_KEYS.forEach(function(k){
-    var row = document.createElement('div'); row.className='statRow'; row.title = STAT_DESC[k] || '';
+    var row = document.createElement('div'); row.className='statRow';
     var nm = document.createElement('span'); nm.className='sname'; nm.textContent = STAT_LABELS[k];
+    var q = document.createElement('span'); q.className='qtip'; q.textContent='?';
+    q.setAttribute('data-tip', STAT_DESC[k]||''); q.title = STAT_DESC[k]||''; nm.appendChild(q);
     var minus = document.createElement('button'); minus.textContent='−';
     minus.disabled = locked || myStats[k] <= STAT_MIN;
     minus.onclick = function(){ if(statsLocked()) return; if(myStats[k]>STAT_MIN){ myStats[k]--; saveStats(); renderStatRows(); pushMyStats(); } };
@@ -3093,10 +3108,11 @@ function renderBotStatRows(){
   STAT_KEYS.forEach(function(k){
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:6px;margin:3px 0';
-    row.title = STAT_DESC[k] || '';
     var lab = document.createElement('span');
     lab.style.cssText = 'flex:1;font-size:11px;color:#9FB3BB';
     lab.textContent = STAT_LABELS[k];
+    var q2 = document.createElement('span'); q2.className='qtip'; q2.textContent='?';
+    q2.setAttribute('data-tip', STAT_DESC[k]||''); q2.title = STAT_DESC[k]||''; lab.appendChild(q2);
     var minus = document.createElement('button');
     minus.textContent='−'; minus.style.cssText='width:22px;padding:2px 0;font-size:12px';
     minus.disabled = st[k] <= 1;
