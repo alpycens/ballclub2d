@@ -1648,11 +1648,37 @@ function botThink(){
         var d5=dist(q5,ball); if(d5<sb2){ sb2=d5; support2=q5; } }
       if(support2 && dist(support2,ball) > 260 + DIFFS[BOT_DIFF].press*90) support2=null;
     }
-    var markMap = {};
+    var markMap = {}, tightId = null;
+    if(!G.markLock) G.markLock = {};
+    if(weHave){ G.markLock[t] = null; }   // top bizdeyken markaj kilidi sifirlanir
     if(!weHave){
       var taken={};
-      // forvetler markaja dusmez (kars-atak cikisi icin onde kalir)
-      var defs = team.filter(function(q6){ return q6.bot && q6!==keeper && q6!==chaser && q6!==support2 && q6.role!=='fwd'; });
+      var ownGX0 = t===0?PX0:PX1;
+      // en tehlikeli rakip: kaleye en yakin (kaleci haric)
+      var dangerMan=null, dmSc=-1e18;
+      for(var dmi=0; dmi<G.players.length; dmi++){ var od=G.players[dmi];
+        if(od.team===t||od.keeper) continue;
+        var dsc = W - Math.abs(od.x - ownGX0);
+        if(dsc>dmSc){ dmSc=dsc; dangerMan=od; } }
+      // HYSTERESIS: oncekini koru (titresmeyi/thrash'i onle) -> kalici man-marking
+      var lock = G.markLock[t] || {};
+      if(lock.oppId!=null){
+        var prevD=null; for(var pkI=0;pkI<G.players.length;pkI++){ var pp=G.players[pkI]; if(pp.id===lock.oppId && pp.team!==t && !pp.keeper){ prevD=pp; break; } }
+        if(prevD){ var prevSc=W-Math.abs(prevD.x-ownGX0); if(prevSc >= dmSc-80) dangerMan=prevD; }
+      }
+      // siki markajci defans: oncekini koru, degilse en yakin defans
+      var tb=null;
+      if(lock.defId!=null){ for(var pf=0;pf<team.length;pf++){ var q=team[pf]; if(q.id===lock.defId && q.bot && q.role==='def' && q!==keeper && q!==chaser && q!==support2){ tb=q; break; } } }
+      if(!tb && dangerMan){
+        var tbd=1e9;
+        for(var ti=0; ti<team.length; ti++){ var q2=team[ti]; if(!q2.bot||q2.role!=='def'||q2===keeper||q2===chaser||q2===support2) continue; var dd=dist(q2,dangerMan); if(dd<tbd){ tbd=dd; tb=q2; } }
+      }
+      // rakip savunma-yarimiza yaklastiginda (orta sahayi gecince) siki markaja al -> daha devamli takip
+      var inOurHalf = dangerMan && ((t===0 && dangerMan.x < W*0.60) || (t===1 && dangerMan.x > W*0.40));
+      if(tb && dangerMan && inOurHalf){ tightId=tb.id; markMap[tb.id]=dangerMan; taken[dangerMan.id]=1; }
+      G.markLock[t] = { oppId: (dangerMan&&inOurHalf)?dangerMan.id:null, defId: tightId };
+      // kalan defans/orta sahalar diger rakipleri markalar (pas hatti kesme)
+      var defs = team.filter(function(q6){ return q6.bot && q6!==keeper && q6!==chaser && q6!==support2 && q6.role!=='fwd' && q6.id!==tightId; });
       for(var mi2=0; mi2<defs.length; mi2++){ var mk=pickMark(defs[mi2], t, taken); if(mk){ markMap[defs[mi2].id]=mk; taken[mk.id]=1; } }
     }
     var slot=0;
@@ -1901,14 +1927,21 @@ function botThink(){
           // tek ikinci baskici (ucuncu bot gelmez -> uşuşme yok)
           tx = ball.x; ty = ball.y;
         } else if(!weHave && markMap[p.id]){
-          // MARKAJ: pas hattini kes -> rakip ile TOP arasinda dur, hafif kale tarafinda
           var om = markMap[p.id];
-          var tbx = ball.x-om.x, tby = ball.y-om.y, tbl = Math.hypot(tbx,tby)||1;
-          var tgx = ownGX-om.x, tgy = ownGY-om.y, tgl = Math.hypot(tgx,tgy)||1;
-          var bxu=tbx/tbl, byu=tby/tbl, gxu=tgx/tgl, gyu=tgy/tgl;
-          var mxu = bxu*0.58 + gxu*0.42, myu = byu*0.58 + gyu*0.42, mlu = Math.hypot(mxu,myu)||1;
-          tx = om.x + (mxu/mlu)*46;
-          ty = om.y + (myu/mlu)*30;
+          if(p.id === tightId){
+            // SIKI MARKAJ: en tehlikeli rakibin YANINDA, kale tarafinda dur (devamli takip)
+            var g2x = ownGX-om.x, g2y = ownGY-om.y, g2l = Math.hypot(g2x,g2y)||1;
+            tx = om.x + (g2x/g2l)*30;   // ~30px kale tarafinda -> tam yaninda
+            ty = om.y + (g2y/g2l)*18;
+          } else {
+            // MARKAJ: pas hattini kes -> rakip ile TOP arasinda dur, hafif kale tarafinda
+            var tbx = ball.x-om.x, tby = ball.y-om.y, tbl = Math.hypot(tbx,tby)||1;
+            var tgx = ownGX-om.x, tgy = ownGY-om.y, tgl = Math.hypot(tgx,tgy)||1;
+            var bxu=tbx/tbl, byu=tby/tbl, gxu=tgx/tgl, gyu=tgy/tgl;
+            var mxu = bxu*0.58 + gxu*0.42, myu = byu*0.58 + gyu*0.42, mlu = Math.hypot(mxu,myu)||1;
+            tx = om.x + (mxu/mlu)*46;
+            ty = om.y + (myu/mlu)*30;
+          }
         } else if(p.role==='def'){
           // defans hatti: topun gerisinde kompakt
           var gap = 300 - BOT_STYLE[t]*75;
@@ -1921,7 +1954,7 @@ function botThink(){
 
         tx = Math.max(PX0+40, Math.min(PX1-40, tx));
         ty = Math.max(PY0+30, Math.min(PY1-30, ty));
-        var isPress = (!weHave && p===support2);
+        var isPress = (!weHave && (p===support2 || p.id===tightId));   // baskici + siki markajci kosarak yetisir
         var moveDist = Math.hypot(tx-p.x, ty-p.y);
         var fSprint = DIFFS[BOT_DIFF].sprint && !p.lock && p.stamina > DIFFS[BOT_DIFF].stamMin*0.4 &&
                       (isPress ? moveDist > 40 : moveDist > 150);   // baskici kosar; kucuk ayarlarda yurunur
