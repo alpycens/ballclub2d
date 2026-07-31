@@ -133,6 +133,15 @@
                 background:#1B2125; border:1px solid #4C5E68; border-radius:3px;
                 color:#E5B356; font-family:monospace; font-weight:700; font-size:10.5px; }
   #ctrlHint span { color:#8FA0A8; }
+  #tacticBar { display:flex; gap:8px; justify-content:center; align-items:center; margin:7px 0 2px; flex-wrap:wrap; }
+  #tacticBar .tlabel { font-size:11px; color:#8FA0A8; margin-right:2px; letter-spacing:0.3px; }
+  #tacticBar .tchip { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:16px;
+    background:#212A2F; border:1px solid #3C4A52; color:#B9C7CE; font-size:12px; cursor:pointer; transition:all .15s; user-select:none; }
+  #tacticBar .tchip:hover { border-color:#5B8C3E; }
+  #tacticBar .tchip .tk { display:inline-block; min-width:15px; text-align:center; padding:0 4px; border-radius:4px;
+    background:#3C4A52; color:#E8E8E8; font-weight:700; font-size:11px; }
+  #tacticBar .tchip.on { background:#2F4A34; border-color:#7DB35A; color:#EAF5DF; }
+  #tacticBar .tchip.on .tk { background:#7DB35A; color:#12181B; }
   #stamWrap { flex:0 0 auto; }
   #chatWrap { width:1000px; margin-top:8px; background:rgba(37,46,51,0.14);
               border:1px solid rgba(60,74,82,0.55); backdrop-filter:blur(2px);
@@ -480,6 +489,13 @@
       <input type="range" id="gzmInp" min="40" max="600" step="5" value="145">
       <label>Ball weight: <span id="gbmVal">145%</span></label>
       <input type="range" id="gbmInp" min="50" max="600" step="10" value="220">
+      <div style="margin-top:12px;padding-top:9px;border-top:1px solid #3C4A52;font-size:11px;color:#7DB35A;font-weight:700;letter-spacing:0.6px">BALL PHYSICS</div>
+      <label>Ball roll (higher = less friction, rolls further): <span id="gbrVal">992</span></label>
+      <input type="range" id="gbrInp" min="950" max="999" step="1" value="992">
+      <label>Wall bounce: <span id="gwbVal">82%</span></label>
+      <input type="range" id="gwbInp" min="0" max="100" step="2" value="82">
+      <label>Ball size: <span id="gbsVal">8</span></label>
+      <input type="range" id="gbsInp" min="5" max="14" step="1" value="8">
       <div id="cfgShare">
         <div class="csTitle">SHARED CONFIG (config.json)</div>
         <div id="cfgStatus">kontrol ediliyor...</div>
@@ -516,6 +532,7 @@
     <div id="ctrlHint"></div>
     <button id="leaveBtn">Back to Menu</button>
   </div>
+  <div id="tacticBar"></div>
   <div id="chatWrap">
     <div id="chatLog"></div>
     <div id="chatRow">
@@ -970,6 +987,9 @@ function applyCfgLocal(){
   G_SHOT   = (typeof LOBBY.cfg.gShot==='number')   ? LOBBY.cfg.gShot   : 1;
   G_PASS   = (typeof LOBBY.cfg.gPass==='number')   ? LOBBY.cfg.gPass   : 1;
   BALL_MASS = (typeof LOBBY.cfg.bMass==='number')  ? LOBBY.cfg.bMass   : 2.2;
+  if(typeof LOBBY.cfg.bRoll==='number')   BDAMP  = Math.min(0.999, Math.max(0.95, LOBBY.cfg.bRoll));
+  if(typeof LOBBY.cfg.wBounce==='number') BOUNCE = Math.min(1, Math.max(0, LOBBY.cfg.wBounce));
+  if(typeof LOBBY.cfg.bSize==='number')   BR     = Math.min(14, Math.max(5, Math.round(LOBBY.cfg.bSize)));
   TEAM_COL[0] = cleanCol(LOBBY.cfg.tc0, DEF_TEAM_COL[0]);
   TEAM_COL[1] = cleanCol(LOBBY.cfg.tc1, DEF_TEAM_COL[1]);
 }
@@ -1409,14 +1429,12 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     }
 
     // top duvarları: üst/alt saha çizgisi, sol/sağ kale ağzı hariç
-    // YAVAS gelen topu (dribbling) sektirme -> duvara yaslanip kalir, etrafinda donebilirsin.
-    // HIZLI gelen top (sut/pas) yine seker.
-    if(ball.y < PY0+BR){ ball.y = PY0+BR; ball.vy = (ball.vy < -2.6) ? -ball.vy*BOUNCE : 0; }
-    if(ball.y > PY1-BR){ ball.y = PY1-BR; ball.vy = (ball.vy >  2.6) ? -ball.vy*BOUNCE : 0; }
+    if(ball.y < PY0+BR){ ball.y = PY0+BR; ball.vy = -ball.vy*BOUNCE; }
+    if(ball.y > PY1-BR){ ball.y = PY1-BR; ball.vy = -ball.vy*BOUNCE; }
     var mouth = ball.y > GY0 && ball.y < GY1;
     if(!mouth){
-      if(ball.x < PX0+BR){ ball.x = PX0+BR; ball.vx = (ball.vx < -2.6) ? -ball.vx*BOUNCE : 0; }
-      if(ball.x > PX1-BR){ ball.x = PX1-BR; ball.vx = (ball.vx >  2.6) ? -ball.vx*BOUNCE : 0; }
+      if(ball.x < PX0+BR){ ball.x = PX0+BR; ball.vx = -ball.vx*BOUNCE; }
+      if(ball.x > PX1-BR){ ball.x = PX1-BR; ball.vx = -ball.vx*BOUNCE; }
     } else {
       // kale içi arka ve yan ağlar
       if(ball.x < PX0-GOAL_DEPTH+BR){ ball.x = PX0-GOAL_DEPTH+BR; ball.vx = -ball.vx*0.4; }
@@ -1753,6 +1771,13 @@ function botThink(){
           slot++;
           continue;
         }
+        // defans: kendi savunma bolgesinde ve baski altindaysa KALECI GIBI temizle
+        var inDefThird = (t===0 ? p.x < W*0.34 : p.x > W*0.66);
+        var pressD3 = 1e9;
+        for(var oz3=0; oz3<G.players.length; oz3++){ var oq3=G.players[oz3];
+          if(oq3.team===t || oq3.keeper) continue; var od3=dist(p,oq3); if(od3<pressD3) pressD3=od3; }
+        var defClear = (p.role==='def' && inDefThird && pressD3 < 66);
+
         if(req){
           // insan emri: X -> bana pas, Space -> kaleye sut. Hizali degilse topun arkasina gec.
           var tax, tay, tspd;
@@ -1770,6 +1795,14 @@ function botThink(){
             var rSprint = D.sprint && p.stamina>D.stamMin*0.35 && !p.lock &&
                           Math.hypot(w3.x-p.x, w3.y-p.y) > 110;
             moveBot(p, w3.x, w3.y, rSprint);
+          }
+        } else if(defClear){
+          // KALECI GIBI AGRESIF TEMIZLEME: topu kendi kaleden uzaga, ileri + yakin yan cizgiye guclu vur
+          var clX = t===0 ? W*0.60 : W*0.40;
+          var clY = (p.y < H/2) ? PY0 + (PY1-PY0)*0.14 : PY0 + (PY1-PY0)*0.86;
+          if(!botKick(p, clX, clY, SHOOT_SPD, -1)){
+            var lsC = lineupSpot(clX, clY);
+            moveBot(p, lsC.x, lsC.y, D.sprint && p.stamina>3 && !p.lock);
           }
         } else if(canShootNow(p, t, gx, gy, D)){
           // sut: gole yaklastikca daha atilgan (dusuk hizalanma esigi)
@@ -2278,6 +2311,9 @@ function hostOnData(conn, msg){
       if(typeof msg.gk2==='number'){ G_SHOT  = Math.min(2, Math.max(0.5, msg.gk2)); LOBBY.cfg.gShot=G_SHOT; }
       if(typeof msg.gp==='number'){ G_PASS = Math.min(2, Math.max(0.5, msg.gp)); LOBBY.cfg.gPass=G_PASS; }
       if(typeof msg.bm==='number'){ BALL_MASS = Math.min(6, Math.max(0.5, msg.bm)); LOBBY.cfg.bMass=BALL_MASS; }
+      if(typeof msg.br==='number'){ BDAMP = Math.min(0.999, Math.max(0.95, msg.br)); LOBBY.cfg.bRoll=BDAMP; }
+      if(typeof msg.wb==='number'){ BOUNCE = Math.min(1, Math.max(0, msg.wb)); LOBBY.cfg.wBounce=BOUNCE; }
+      if(typeof msg.bs==='number'){ BR = Math.min(14, Math.max(5, Math.round(msg.bs))); LOBBY.cfg.bSize=BR; }
       if(typeof msg.sp==='number') LOBBY.cfg.spdP = SPD_P;
       if(typeof msg.sb==='number') LOBBY.cfg.spdB = SPD_B;
       saveGameCfg(); pushLobby();
@@ -2392,6 +2428,7 @@ function startGameUI(){
   el('lobby').style.display='none';
   el('gameWrap').style.display='flex';
   updateCtrlHint();
+  renderTacticBar();
   refitSoon();   // tek deneme yerine 30/120/350/800ms tekrar -> layout otursun, "cok uzaktan" bug'i biter
   if(!running){ running = true; lastT = performance.now(); requestAnimationFrame(loop); }
 }
@@ -3871,6 +3908,7 @@ function setTeamTactic(team, val){
   if(role==='host'){ if(typeof pushLobby==='function') pushLobby(); }
   else if(typeof hostConn!=='undefined' && hostConn && hostConn.open){ hostConn.send({t:'lreq', a:'style', team:team, style:val}); }
   flashTactic(val);
+  renderTacticBar();
 }
 function flashTactic(val){
   var names=['DEFENSIVE','BALANCED','OFFENSIVE'], cols=['#5689E5','#CDE6B4','#E5945B'];
@@ -3885,6 +3923,21 @@ function flashTactic(val){
   d.style.opacity = '1';
   clearTimeout(d._t);
   d._t = setTimeout(function(){ d.style.opacity='0'; }, 1300);
+}
+// Saha altindaki taktik cubugu: J/K/L kisayollari + aktif olan vurgulu
+function renderTacticBar(){
+  var bar = el('tacticBar'); if(!bar) return;
+  var ms = mySlot(); var team = (ms && (ms.team===0||ms.team===1)) ? ms.team : null;
+  if(team===null){ bar.innerHTML=''; return; }
+  var cur = BOT_STYLE[team];
+  var opts = [['J',0,'Defensive'],['K',1,'Balanced'],['L',2,'Offensive']];
+  var html = '<span class="tlabel">Team tactic</span>';
+  opts.forEach(function(o){
+    html += '<span class="tchip'+(cur===o[1]?' on':'')+'" data-v="'+o[1]+'"><span class="tk">'+o[0]+'</span>'+o[2]+'</span>';
+  });
+  bar.innerHTML = html;
+  var chips = bar.querySelectorAll('.tchip');
+  for(var i=0;i<chips.length;i++){ chips[i].onclick = function(){ setTeamTactic(team, parseInt(this.getAttribute('data-v'),10)); }; }
 }
 
 function keySet(e, down){
@@ -4001,8 +4054,7 @@ function updateCtrlHint(){
     ' &nbsp;<span>Goalkeeper</span> ' + K('gkout') +
     ' &nbsp;<span>Lobby</span> ' + K('lobby') +
     ' &nbsp;<span>Pause</span> ' + K('pause') +
-    ' &nbsp;<span>Camera</span> <b>1</b><b>2</b><b>3</b><b>4</b>' +
-    ' &nbsp;<span>Tactic</span> <b>J</b><b>K</b><b>L</b>';
+    ' &nbsp;<span>Camera</span> <b>1</b><b>2</b><b>3</b><b>4</b>';
 }
 
 function renderKeyRows(){
@@ -4214,6 +4266,9 @@ function syncPanel(){
   el('gpaInp').value=gp2; el('gpaVal').textContent=gp2+'%';
   var bm2 = Math.round(BALL_MASS*100);
   el('gbmInp').value=bm2; el('gbmVal').textContent=bm2+'%';
+  if(el('gbrInp')){ var br2=Math.round(BDAMP*1000); el('gbrInp').value=br2; el('gbrVal').textContent=br2; }
+  if(el('gwbInp')){ var wb2=Math.round(BOUNCE*100); el('gwbInp').value=wb2; el('gwbVal').textContent=wb2+'%'; }
+  if(el('gbsInp')){ el('gbsInp').value=BR; el('gbsVal').textContent=BR; }
 }
 
 el('pwBtn').onclick = function(){
@@ -4239,6 +4294,12 @@ function applyLive(){
   var gk = parseInt(el('ggkInp').value,10)/100;
   var bm = parseInt(el('gbmInp').value,10)/100;
   var gp = parseInt(el('gpaInp').value,10)/100;
+  var bRoll = el('gbrInp') ? parseInt(el('gbrInp').value,10)/1000 : BDAMP;
+  var wBounce = el('gwbInp') ? parseInt(el('gwbInp').value,10)/100 : BOUNCE;
+  var bSize = el('gbsInp') ? parseInt(el('gbsInp').value,10) : BR;
+  if(el('gbrVal')) el('gbrVal').textContent = Math.round(bRoll*1000);
+  if(el('gwbVal')) el('gwbVal').textContent = Math.round(wBounce*100)+'%';
+  if(el('gbsVal')) el('gbsVal').textContent = bSize;
   el('gpaVal').textContent = Math.round(gp*100)+'%';
   el('gbmVal').textContent = Math.round(bm*100)+'%';
   el('ggsVal').textContent = Math.round(gs*100)+'%';
@@ -4246,12 +4307,14 @@ function applyLive(){
   el('ggkVal').textContent = Math.round(gk*100)+'%';
   if(role==='host'){
     SPD_P=sp; SPD_B=sb; BOT_DIFF=bd; G_SPRINT=gs; G_CURVE=gc; G_SHOT=gk; BALL_MASS=bm; G_PASS=gp;
+    BDAMP=bRoll; BOUNCE=wBounce; BR=bSize;
     LOBBY.cfg.spdP=sp; LOBBY.cfg.spdB=sb; LOBBY.cfg.bMass=bm; LOBBY.cfg.gPass=gp;
     LOBBY.cfg.diff=bd; LOBBY.cfg.gSprint=gs; LOBBY.cfg.gCurve=gc; LOBBY.cfg.gShot=gk;
+    LOBBY.cfg.bRoll=bRoll; LOBBY.cfg.wBounce=wBounce; LOBBY.cfg.bSize=bSize;
     saveGameCfg();     // her yeni odada da gecerli olsun
     pushLobby();       // lobideki herkese aninda bildir
   }
-  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, bd:bd, gs:gs, gc:gc, gk2:gk, bm:bm, gp:gp}); }
+  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, bd:bd, gs:gs, gc:gc, gk2:gk, bm:bm, gp:gp, br:bRoll, wb:wBounce, bs:bSize}); }
 }
 el('gpInp').oninput = applyLive;
 el('gbInp').oninput = applyLive;
@@ -4259,6 +4322,9 @@ el('ggsInp').oninput = applyLive;
 el('ggcInp').oninput = applyLive;
 el('ggkInp').oninput = applyLive;
 el('gbmInp').oninput = applyLive;
+if(el('gbrInp')) el('gbrInp').oninput = applyLive;
+if(el('gwbInp')) el('gwbInp').oninput = applyLive;
+if(el('gbsInp')) el('gbsInp').oninput = applyLive;
 el('gzmInp').oninput = function(){
   CAM.preset = 0;                       // elle ayar: kademe disi
   var z = parseInt(this.value,10)/100;
