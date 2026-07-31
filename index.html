@@ -143,8 +143,8 @@
   #tacticBar .tchip.on { background:#2F4A34; border-color:#7DB35A; color:#EAF5DF; }
   #tacticBar .tchip.on .tk { background:#7DB35A; color:#12181B; }
   #stamWrap { flex:0 0 auto; }
-  #chatWrap { width:1000px; margin-top:8px; background:rgba(37,46,51,0.14);
-              border:1px solid rgba(60,74,82,0.55); backdrop-filter:blur(2px);
+  #chatWrap { width:1000px; margin-top:8px; background:transparent;
+              border:1px solid transparent; backdrop-filter:none;
               transition:background .15s, border-color .15s;
               border-radius:8px; padding:8px 12px; }
   #chatLog { height:86px; overflow-y:auto; font-size:13px; line-height:1.45;
@@ -156,10 +156,11 @@
   #chatLog .cn.t1 { color:#E8E8E8; }
   #chatLog .sys { color:#8FA0A8; font-style:italic; font-size:12px; }
   #chatRow { display:flex; gap:8px; }
-  #chatWrap:hover, #chatWrap:focus-within { background:rgba(37,46,51,0.82);
-              border-color:rgba(96,116,128,0.8); }
-  #chatInp { flex:1; padding:7px 10px; background:rgba(27,33,37,0.55); color:#E8E8E8;
-             border:1px solid #3C4A52; border-radius:4px; font-size:13px; outline:none; }
+  #chatWrap:hover, #chatWrap:focus-within { background:rgba(37,46,51,0.16);
+              border-color:rgba(96,116,128,0.35); }
+  #chatInp { flex:1; padding:7px 10px; background:rgba(27,33,37,0.18); color:#E8E8E8;
+             border:1px solid rgba(60,74,82,0.45); border-radius:4px; font-size:13px; outline:none;
+             text-shadow:0 1px 2px rgba(0,0,0,0.6); }
   #chatInp:focus { border-color:#CDE6B4; }
   #chatSend { flex:0 0 auto; width:90px; padding:7px 0; font-size:13px; }
   #leaveBtn { flex:0 0 auto; width:110px; padding:6px 0; font-size:12px; background:#7A3C3C; }
@@ -178,10 +179,10 @@
   body.fsmode #botBar { position:absolute; bottom:0; left:0; z-index:5;
     background:rgba(37,46,51,0.82); border:none; border-radius:0; backdrop-filter:blur(2px); }
   body.fsmode #chatWrap { position:absolute; left:10px; bottom:54px; z-index:4;
-    background:rgba(37,46,51,0.12); border-color:rgba(60,74,82,0.4);
+    background:transparent; border-color:transparent;
     padding:6px 8px; border-radius:7px; }
   body.fsmode #chatWrap:hover, body.fsmode #chatWrap:focus-within {
-    background:rgba(37,46,51,0.78); border-color:rgba(96,116,128,0.8); }
+    background:rgba(37,46,51,0.16); border-color:rgba(96,116,128,0.35); }
   body.fsmode #chatLog { height:40px; font-size:12px; line-height:1.35; margin-bottom:4px; }
   body.fsmode #chatRow { gap:6px; }
   body.fsmode #chatInp { padding:5px 8px; font-size:12px; }
