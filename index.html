@@ -178,6 +178,8 @@
     background:rgba(37,46,51,0.82); border:none; border-radius:0; backdrop-filter:blur(2px); }
   body.fsmode #botBar { position:absolute; bottom:0; left:0; z-index:5;
     background:rgba(37,46,51,0.82); border:none; border-radius:0; backdrop-filter:blur(2px); }
+  body.fsmode #tacticBar { position:absolute; bottom:46px; left:50%; transform:translateX(-50%); z-index:6;
+    margin:0; background:rgba(15,20,23,0.6); padding:4px 10px; border-radius:14px; backdrop-filter:blur(2px); }
   body.fsmode #chatWrap { position:absolute; left:10px; bottom:54px; z-index:4;
     background:transparent; border-color:transparent;
     padding:6px 8px; border-radius:7px; }
@@ -488,8 +490,8 @@
       <input type="range" id="gpaInp" min="50" max="200" step="10" value="100">
       <label>Camera zoom: <span id="gzmVal">145%</span></label>
       <input type="range" id="gzmInp" min="40" max="600" step="5" value="145">
-      <label>Ball weight: <span id="gbmVal">145%</span></label>
-      <input type="range" id="gbmInp" min="50" max="600" step="10" value="220">
+      <label>Ball weight (mass): <span id="gbmVal">3</span></label>
+      <input type="range" id="gbmInp" min="1" max="600" step="1" value="3">
       <div style="margin-top:12px;padding-top:9px;border-top:1px solid #3C4A52;font-size:11px;color:#7DB35A;font-weight:700;letter-spacing:0.6px">BALL PHYSICS</div>
       <label>Ball roll (higher = less friction, rolls further): <span id="gbrVal">992</span></label>
       <input type="range" id="gbrInp" min="900" max="999" step="1" value="992">
@@ -497,8 +499,8 @@
       <input type="range" id="gwbInp" min="0" max="100" step="2" value="82">
       <label>Ball size: <span id="gbsVal">8</span></label>
       <input type="range" id="gbsInp" min="5" max="14" step="1" value="8">
-      <label>Ball grip (stick to feet - turn around it): <span id="gbgVal">15%</span></label>
-      <input type="range" id="gbgInp" min="0" max="70" step="2" value="15">
+      <label>Ball grip (stick to feet - turn around it): <span id="gbgVal">0%</span></label>
+      <input type="range" id="gbgInp" min="0" max="70" step="2" value="0">
       <div id="cfgShare">
         <div class="csTitle">SHARED CONFIG (config.json)</div>
         <div id="cfgStatus">kontrol ediliyor...</div>
@@ -552,7 +554,7 @@ var fieldSize = 'big';
 var GOAL_DEPTH = 34;
 var PR = 15, BR = 8, POST_R = 6;
 var BALL_MASS = 2.2;   // top oyuncudan agir: itince az kayar, etrafinda donerek konum alabilirsin                    // yarıçaplar (POST_R: kale diregi)
-var BALL_GRIP = 0.15;  // temas halinde top oyuncunun hizina dogru cekilir (yapiskanlik). Yuksek -> top durunca durur, etrafinda donebilirsin
+var BALL_GRIP = 0;  // temas halinde topu oyuncunun hizina cekme (0 = kapali). Ayardan acilabilir.
 var KICK_RANGE = PR + BR + 6;
 var ACC = 0.30, PDAMP = 0.925, BASE_MAX = 2.55, SPRINT_MAX = 4.25;
 // herkese uygulanan global carpanlar (host ayarlar, herkese yayilir)
@@ -2336,7 +2338,7 @@ function hostOnData(conn, msg){
       if(typeof msg.gc==='number'){ G_CURVE  = Math.min(3, Math.max(0,   msg.gc)); LOBBY.cfg.gCurve=G_CURVE; }
       if(typeof msg.gk2==='number'){ G_SHOT  = Math.min(2, Math.max(0.5, msg.gk2)); LOBBY.cfg.gShot=G_SHOT; }
       if(typeof msg.gp==='number'){ G_PASS = Math.min(2, Math.max(0.5, msg.gp)); LOBBY.cfg.gPass=G_PASS; }
-      if(typeof msg.bm==='number'){ BALL_MASS = Math.min(6, Math.max(0.5, msg.bm)); LOBBY.cfg.bMass=BALL_MASS; }
+      if(typeof msg.bm==='number'){ BALL_MASS = Math.min(600, Math.max(0.5, msg.bm)); LOBBY.cfg.bMass=BALL_MASS; }
       if(typeof msg.br==='number'){ BDAMP = Math.min(0.999, Math.max(0.95, msg.br)); LOBBY.cfg.bRoll=BDAMP; }
       if(typeof msg.wb==='number'){ BOUNCE = Math.min(1, Math.max(0, msg.wb)); LOBBY.cfg.wBounce=BOUNCE; }
       if(typeof msg.bs==='number'){ BR = Math.min(14, Math.max(5, Math.round(msg.bs))); LOBBY.cfg.bSize=BR; }
@@ -2662,6 +2664,9 @@ function render(v){
   ctx.translate(-CAM.x, -CAM.y);
   // saha
   ctx.fillStyle='#718C5A'; ctx.fillRect(0,0,W,H);
+  // koyu şerit doku
+  ctx.fillStyle='rgba(0,0,0,0.045)';
+  for(var s=0;s<10;s+=2) ctx.fillRect(PX0 + s*(PX1-PX0)/10, PY0, (PX1-PX0)/10, PY1-PY0);
   // çizgiler
   ctx.strokeStyle='#C7D6B5'; ctx.lineWidth=3;
   ctx.strokeRect(PX0,PY0,PX1-PX0,PY1-PY0);
@@ -3787,6 +3792,7 @@ function fitScale(){
   var sc = el('gameScale'); if(!sc || el('gameWrap').style.display==='none') return;
   var fs = fsActive();
   document.body.classList.toggle('fsmode', !!fs);
+  if(typeof renderTacticBar==='function') renderTacticBar();
   // API tam ekranda Esc, tarayiciyi tam ekrandan cikarir. Escape tusunu kilitleyerek
   // Esc'i kendimiz yakalariz (lobi ac/kapat) ve tam ekran korunur. (Chromium destekler)
   if(isFs()){
@@ -4288,8 +4294,8 @@ function syncPanel(){
   el('gzmInp').value=cz; el('gzmVal').textContent=cz+'%';
   var gp2 = Math.round(G_PASS*100);
   el('gpaInp').value=gp2; el('gpaVal').textContent=gp2+'%';
-  var bm2 = Math.round(BALL_MASS*100);
-  el('gbmInp').value=bm2; el('gbmVal').textContent=bm2+'%';
+  var bm2 = Math.round(BALL_MASS);
+  el('gbmInp').value=bm2; el('gbmVal').textContent=bm2;
   if(el('gbrInp')){ var br2=Math.round(BDAMP*1000); el('gbrInp').value=br2; el('gbrVal').textContent=br2; }
   if(el('gwbInp')){ var wb2=Math.round(BOUNCE*100); el('gwbInp').value=wb2; el('gwbVal').textContent=wb2+'%'; }
   if(el('gbsInp')){ el('gbsInp').value=BR; el('gbsVal').textContent=BR; }
@@ -4317,7 +4323,7 @@ function applyLive(){
   var gs = parseInt(el('ggsInp').value,10)/100;
   var gc = parseInt(el('ggcInp').value,10)/100;
   var gk = parseInt(el('ggkInp').value,10)/100;
-  var bm = parseInt(el('gbmInp').value,10)/100;
+  var bm = parseInt(el('gbmInp').value,10);   // ham kutle (1..600)
   var gp = parseInt(el('gpaInp').value,10)/100;
   var bRoll = el('gbrInp') ? parseInt(el('gbrInp').value,10)/1000 : BDAMP;
   var wBounce = el('gwbInp') ? parseInt(el('gwbInp').value,10)/100 : BOUNCE;
@@ -4328,7 +4334,7 @@ function applyLive(){
   if(el('gbsVal')) el('gbsVal').textContent = bSize;
   if(el('gbgVal')) el('gbgVal').textContent = Math.round(bGrip*100)+'%';
   el('gpaVal').textContent = Math.round(gp*100)+'%';
-  el('gbmVal').textContent = Math.round(bm*100)+'%';
+  el('gbmVal').textContent = bm;
   el('ggsVal').textContent = Math.round(gs*100)+'%';
   el('ggcVal').textContent = Math.round(gc*100)+'%';
   el('ggkVal').textContent = Math.round(gk*100)+'%';
