@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": 1785483403621,
+  "updated": 1785483523502,
   "spdP": 0.5,
   "spdB": 0.5,
   "gSprint": 1,
@@ -170,36 +170,36 @@
         "curve": 3,
         "sprint": 4,
         "drib": 3,
-        "power": 5,
+        "power": 10,
         "energy": 5,
         "ftouch": 5
       },
       "def": {
         "shot": 4,
         "curve": 3,
-        "sprint": 4,
+        "sprint": 7,
         "drib": 4,
-        "power": 5,
-        "energy": 5,
+        "power": 7,
+        "energy": 7,
         "ftouch": 5
       },
       "mid": {
         "shot": 4,
         "curve": 4,
-        "sprint": 4,
-        "drib": 5,
+        "sprint": 7,
+        "drib": 7,
         "power": 4,
-        "energy": 5,
-        "ftouch": 5
+        "energy": 7,
+        "ftouch": 6
       },
       "fwd": {
-        "shot": 5,
+        "shot": 7,
         "curve": 4,
-        "sprint": 5,
+        "sprint": 7,
         "drib": 4,
-        "power": 3,
-        "energy": 5,
-        "ftouch": 5
+        "power": 7,
+        "energy": 6,
+        "ftouch": 6
       }
     }
   }
