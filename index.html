@@ -1445,6 +1445,14 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
         if(ball.y > GY1-BR){ ball.y=GY1-BR; ball.vy=-ball.vy*0.4; }
       }
     }
+    // KOSE: top koseye sikisip pinball gibi asiri sekmesin -> koseye yakinken enerjiyi sondur + hafif ice it
+    var nearH = (ball.y <= PY0+BR+9) || (ball.y >= PY1-BR-9);
+    var nearV = ((ball.x <= PX0+BR+9) || (ball.x >= PX1-BR-9)) && !mouth;
+    if(nearH && nearV){
+      ball.vx *= 0.55; ball.vy *= 0.55;
+      ball.x += (ball.x < W/2 ? 1 : -1) * 0.6;
+      ball.y += (ball.y < H/2 ? 1 : -1) * 0.6;
+    }
     // duvar duzeltmesi topu bir oyuncunun icine itmis olabilir: tekrar coz
     resolveBallPlayers(true);
   }
@@ -2654,9 +2662,6 @@ function render(v){
   ctx.translate(-CAM.x, -CAM.y);
   // saha
   ctx.fillStyle='#718C5A'; ctx.fillRect(0,0,W,H);
-  // koyu şerit doku
-  ctx.fillStyle='rgba(0,0,0,0.045)';
-  for(var s=0;s<10;s+=2) ctx.fillRect(PX0 + s*(PX1-PX0)/10, PY0, (PX1-PX0)/10, PY1-PY0);
   // çizgiler
   ctx.strokeStyle='#C7D6B5'; ctx.lineWidth=3;
   ctx.strokeRect(PX0,PY0,PX1-PX0,PY1-PY0);
