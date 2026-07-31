@@ -491,11 +491,13 @@
       <input type="range" id="gbmInp" min="50" max="600" step="10" value="220">
       <div style="margin-top:12px;padding-top:9px;border-top:1px solid #3C4A52;font-size:11px;color:#7DB35A;font-weight:700;letter-spacing:0.6px">BALL PHYSICS</div>
       <label>Ball roll (higher = less friction, rolls further): <span id="gbrVal">992</span></label>
-      <input type="range" id="gbrInp" min="950" max="999" step="1" value="992">
+      <input type="range" id="gbrInp" min="900" max="999" step="1" value="992">
       <label>Wall bounce: <span id="gwbVal">82%</span></label>
       <input type="range" id="gwbInp" min="0" max="100" step="2" value="82">
       <label>Ball size: <span id="gbsVal">8</span></label>
       <input type="range" id="gbsInp" min="5" max="14" step="1" value="8">
+      <label>Ball grip (stick to feet - turn around it): <span id="gbgVal">15%</span></label>
+      <input type="range" id="gbgInp" min="0" max="70" step="2" value="15">
       <div id="cfgShare">
         <div class="csTitle">SHARED CONFIG (config.json)</div>
         <div id="cfgStatus">kontrol ediliyor...</div>
@@ -508,12 +510,8 @@
       </div>
       <!-- Bot difficulty secicisi kaldirildi: botlar her zaman en guclu (Master) seviyede -->
       <div style="margin-top:10px;padding-top:8px;border-top:1px solid #3C4A52">
-        <label style="color:#CDE6B4;letter-spacing:1px;font-size:11px">BOT STATS</label>
+        <label style="color:#CDE6B4;letter-spacing:1px;font-size:11px">BOT STATS <span style="color:#7C8A91;font-weight:400;font-size:10px">(single level — most advanced)</span></label>
         <div style="display:flex;gap:6px;margin:6px 0">
-          <select id="bsLvl" style="flex:1;padding:5px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:12px">
-            <option value="0">Beginner</option><option value="1">Intermediate</option>
-            <option value="2" selected>Advanced</option><option value="3">Expert</option><option value="4">Master</option>
-          </select>
           <select id="bsPos" style="flex:1;padding:5px;background:#1B2125;color:#E8E8E8;border:1px solid #3C4A52;border-radius:4px;font-size:12px">
             <option value="gk">Goalkeeper</option><option value="def">Defender</option>
             <option value="mid" selected>Midfielder</option><option value="fwd">Forward</option>
@@ -553,6 +551,7 @@ var fieldSize = 'big';
 var GOAL_DEPTH = 34;
 var PR = 15, BR = 8, POST_R = 6;
 var BALL_MASS = 2.2;   // top oyuncudan agir: itince az kayar, etrafinda donerek konum alabilirsin                    // yarıçaplar (POST_R: kale diregi)
+var BALL_GRIP = 0.15;  // temas halinde top oyuncunun hizina dogru cekilir (yapiskanlik). Yuksek -> top durunca durur, etrafinda donebilirsin
 var KICK_RANGE = PR + BR + 6;
 var ACC = 0.30, PDAMP = 0.925, BASE_MAX = 2.55, SPRINT_MAX = 4.25;
 // herkese uygulanan global carpanlar (host ayarlar, herkese yayilir)
@@ -987,9 +986,10 @@ function applyCfgLocal(){
   G_SHOT   = (typeof LOBBY.cfg.gShot==='number')   ? LOBBY.cfg.gShot   : 1;
   G_PASS   = (typeof LOBBY.cfg.gPass==='number')   ? LOBBY.cfg.gPass   : 1;
   BALL_MASS = (typeof LOBBY.cfg.bMass==='number')  ? LOBBY.cfg.bMass   : 2.2;
-  if(typeof LOBBY.cfg.bRoll==='number')   BDAMP  = Math.min(0.999, Math.max(0.95, LOBBY.cfg.bRoll));
+  if(typeof LOBBY.cfg.bRoll==='number')   BDAMP  = Math.min(0.999, Math.max(0.90, LOBBY.cfg.bRoll));
   if(typeof LOBBY.cfg.wBounce==='number') BOUNCE = Math.min(1, Math.max(0, LOBBY.cfg.wBounce));
   if(typeof LOBBY.cfg.bSize==='number')   BR     = Math.min(14, Math.max(5, Math.round(LOBBY.cfg.bSize)));
+  if(typeof LOBBY.cfg.bGrip==='number')   BALL_GRIP = Math.min(0.7, Math.max(0, LOBBY.cfg.bGrip));
   TEAM_COL[0] = cleanCol(LOBBY.cfg.tc0, DEF_TEAM_COL[0]);
   TEAM_COL[1] = cleanCol(LOBBY.cfg.tc1, DEF_TEAM_COL[1]);
 }
@@ -1446,6 +1446,23 @@ function stepGame(dt){ // dt: 60fps kare cinsinden (~1)
     }
     // duvar duzeltmesi topu bir oyuncunun icine itmis olabilir: tekrar coz
     resolveBallPlayers(true);
+  }
+  // BALL GRIP (kontrol bolgesi): top yavassa ve bir oyuncunun ayaklarinin hemen yanindaysa,
+  // topun hizi o oyuncunun hizina dogru cekilir -> ayakta kalir, oyuncu durunca durur (etrafinda donebilirsin).
+  if(BALL_GRIP > 0){
+    var bspG = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+    if(bspG < PASS_SPD*0.9){
+      var gz = PR + BR + 7, nd = gz*gz, near = null;
+      for(var gi=0; gi<G.players.length; gi++){ var gq=G.players[gi];
+        var gdx=ball.x-gq.x, gdy=ball.y-gq.y, gdd=gdx*gdx+gdy*gdy;
+        if(gdd<nd){ nd=gdd; near=gq; } }
+      if(near){
+        var prox = 1 - Math.sqrt(nd)/gz;                 // temasa yakin=1, kenarda=0
+        var gg = BALL_GRIP * (0.45 + 0.55*prox) * dt;
+        ball.vx += (near.vx - ball.vx) * gg;
+        ball.vy += (near.vy - ball.vy) * gg;
+      }
+    }
   }
   ball.vx *= Math.pow(BDAMP, dt); ball.vy *= Math.pow(BDAMP, dt);
   var inMouth = ball.y > GY0 && ball.y < GY1;
@@ -2314,6 +2331,7 @@ function hostOnData(conn, msg){
       if(typeof msg.br==='number'){ BDAMP = Math.min(0.999, Math.max(0.95, msg.br)); LOBBY.cfg.bRoll=BDAMP; }
       if(typeof msg.wb==='number'){ BOUNCE = Math.min(1, Math.max(0, msg.wb)); LOBBY.cfg.wBounce=BOUNCE; }
       if(typeof msg.bs==='number'){ BR = Math.min(14, Math.max(5, Math.round(msg.bs))); LOBBY.cfg.bSize=BR; }
+      if(typeof msg.bg==='number'){ BALL_GRIP = Math.min(0.7, Math.max(0, msg.bg)); LOBBY.cfg.bGrip=BALL_GRIP; }
       if(typeof msg.sp==='number') LOBBY.cfg.spdP = SPD_P;
       if(typeof msg.sb==='number') LOBBY.cfg.spdB = SPD_B;
       saveGameCfg(); pushLobby();
@@ -3180,7 +3198,7 @@ function pushMyStats(){
 /* ================= BOT STAT AYARLARI ================= */
 function renderBotStatRows(){
   var host = el('bsRows'); if(!host) return;
-  var lvl = parseInt(el('bsLvl').value,10);
+  var lvl = 4;   // tek seviye: en gelismis (Master) - botlar bunu kullanir
   if(isNaN(lvl)) lvl = 2;
   lvl = Math.max(0, Math.min(4, lvl));
   var pos = el('bsPos').value;
@@ -4269,6 +4287,7 @@ function syncPanel(){
   if(el('gbrInp')){ var br2=Math.round(BDAMP*1000); el('gbrInp').value=br2; el('gbrVal').textContent=br2; }
   if(el('gwbInp')){ var wb2=Math.round(BOUNCE*100); el('gwbInp').value=wb2; el('gwbVal').textContent=wb2+'%'; }
   if(el('gbsInp')){ el('gbsInp').value=BR; el('gbsVal').textContent=BR; }
+  if(el('gbgInp')){ var bg2=Math.round(BALL_GRIP*100); el('gbgInp').value=bg2; el('gbgVal').textContent=bg2+'%'; }
 }
 
 el('pwBtn').onclick = function(){
@@ -4297,9 +4316,11 @@ function applyLive(){
   var bRoll = el('gbrInp') ? parseInt(el('gbrInp').value,10)/1000 : BDAMP;
   var wBounce = el('gwbInp') ? parseInt(el('gwbInp').value,10)/100 : BOUNCE;
   var bSize = el('gbsInp') ? parseInt(el('gbsInp').value,10) : BR;
+  var bGrip = el('gbgInp') ? parseInt(el('gbgInp').value,10)/100 : BALL_GRIP;
   if(el('gbrVal')) el('gbrVal').textContent = Math.round(bRoll*1000);
   if(el('gwbVal')) el('gwbVal').textContent = Math.round(wBounce*100)+'%';
   if(el('gbsVal')) el('gbsVal').textContent = bSize;
+  if(el('gbgVal')) el('gbgVal').textContent = Math.round(bGrip*100)+'%';
   el('gpaVal').textContent = Math.round(gp*100)+'%';
   el('gbmVal').textContent = Math.round(bm*100)+'%';
   el('ggsVal').textContent = Math.round(gs*100)+'%';
@@ -4307,14 +4328,14 @@ function applyLive(){
   el('ggkVal').textContent = Math.round(gk*100)+'%';
   if(role==='host'){
     SPD_P=sp; SPD_B=sb; BOT_DIFF=bd; G_SPRINT=gs; G_CURVE=gc; G_SHOT=gk; BALL_MASS=bm; G_PASS=gp;
-    BDAMP=bRoll; BOUNCE=wBounce; BR=bSize;
+    BDAMP=bRoll; BOUNCE=wBounce; BR=bSize; BALL_GRIP=bGrip;
     LOBBY.cfg.spdP=sp; LOBBY.cfg.spdB=sb; LOBBY.cfg.bMass=bm; LOBBY.cfg.gPass=gp;
     LOBBY.cfg.diff=bd; LOBBY.cfg.gSprint=gs; LOBBY.cfg.gCurve=gc; LOBBY.cfg.gShot=gk;
-    LOBBY.cfg.bRoll=bRoll; LOBBY.cfg.wBounce=wBounce; LOBBY.cfg.bSize=bSize;
+    LOBBY.cfg.bRoll=bRoll; LOBBY.cfg.wBounce=wBounce; LOBBY.cfg.bSize=bSize; LOBBY.cfg.bGrip=bGrip;
     saveGameCfg();     // her yeni odada da gecerli olsun
     pushLobby();       // lobideki herkese aninda bildir
   }
-  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, bd:bd, gs:gs, gc:gc, gk2:gk, bm:bm, gp:gp, br:bRoll, wb:wBounce, bs:bSize}); }
+  else if(hostConn && hostConn.open){ hostConn.send({t:'set', pw:SET_PW, sp:sp, sb:sb, bd:bd, gs:gs, gc:gc, gk2:gk, bm:bm, gp:gp, br:bRoll, wb:wBounce, bs:bSize, bg:bGrip}); }
 }
 el('gpInp').oninput = applyLive;
 el('gbInp').oninput = applyLive;
@@ -4325,6 +4346,7 @@ el('gbmInp').oninput = applyLive;
 if(el('gbrInp')) el('gbrInp').oninput = applyLive;
 if(el('gwbInp')) el('gwbInp').oninput = applyLive;
 if(el('gbsInp')) el('gbsInp').oninput = applyLive;
+if(el('gbgInp')) el('gbgInp').oninput = applyLive;
 el('gzmInp').oninput = function(){
   CAM.preset = 0;                       // elle ayar: kademe disi
   var z = parseInt(this.value,10)/100;
@@ -4350,7 +4372,6 @@ renderKitUI();
 
 updateCtrlHint();
 BOT_STATS = loadBotStats();
-el('bsLvl').onchange = renderBotStatRows;
 el('bsPos').onchange = renderBotStatRows;
 renderBotStatRows();
 
